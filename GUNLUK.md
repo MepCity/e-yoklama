@@ -239,4 +239,65 @@ attendance_records (1) ──< (N) verification_logs [record_id]
 
 ---
 
+### 4. Adım 1 — Git + Temel Dosyalar (Tamamlandı)
+
+**Tarih:** 2026-04-26
+
+**Oluşturulan dosyalar:**
+- `.gitignore` — Python, IDE, OS, veritabanı dosyaları için ignore kuralları
+- `requirements.txt` — 10 bağımlılık: Flask 3.1.1, SQLAlchemy 2.0.40, Flask-SocketIO 5.5.1, flask-limiter 3.11.0, openpyxl 3.1.5, qrcode 8.0, geopy 2.4.1, Pillow 11.2.1, python-socketio 5.13.0, python-engineio 4.12.1
+- `config.py` — Config/DevelopmentConfig/ProductionConfig/TestConfig sınıfları. QR yenileme, geofence, IP, rate limit, devamsızlık eşiği ayarları
+
+**Test:** `pip install` başarılı, config import doğrulandı.
+
+### 5. Adım 2 — Veritabanı Katmanı (Tamamlandı)
+
+**Tarih:** 2026-04-26
+
+**Oluşturulan dosyalar:**
+- `database/__init__.py` — `init_db(app)`, `get_db()` export. `app.teardown_appcontext` ile her request sonunda session temizleme
+- `database/session.py` — `engine`, `scoped_session` (thread-safe), `Base`, `shutdown_session`
+
+**Eski `databases/` ile farkı:**
+- Eski: `db = SessionLocal()` ile global tek session kullanıyordu; bu yapı request/thread bazlı session yönetimi sağlamıyordu
+- Yeni: `scoped_session` ile her thread kendi session'ına sahip, `teardown_appcontext` ile otomatik temizleme
+
+**Test:** Engine oluşturma, session alma, shutdown başarılı.
+
+### 6. Adım 3 — Yardımcı Araçlar (Tamamlandı)
+
+**Tarih:** 2026-04-26
+
+**Oluşturulan dosyalar:**
+- `utils/__init__.py`
+- `utils/hashing.py` — `hash_password()`, `verify_password()` (eski `controllers/hash.py`'den taşındı, aynı PBKDF2-SHA256 mantığı)
+- `utils/decorators.py` — `@login_required`, `@role_required(*roles)` (tüm view'larda tekrar eden session kontrolünü merkezileştirdik)
+- `utils/helpers.py` — Türkçe gün adları, durum etiketleri/renkleri, tarih formatlama fonksiyonları
+- `utils/qr_generator.py` — `generate_qr_base64(data)` QR kod üretip base64 string döner
+
+**Test:** Hash/verify çalışıyor, helper fonksiyonlar doğru, QR base64 üretimi başarılı.
+
+### 7. Adım 4 — Yeni Modeller (Tamamlandı)
+
+**Tarih:** 2026-04-26
+
+**Oluşturulan/değiştirilen dosyalar:**
+- `models/__init__.py` — Yeniden yazıldı, yeni model import'ları
+- `models/user.py` — `User` modeli (eski `Users` → tekil isimlendirme). `to_dict()` metodu eklendi. İş mantığı (login, register, logout) çıkarıldı → service'e taşınacak
+- `models/course.py` — `Course` + `CourseStudent` modelleri. `code` ve `semester` alanları eklendi. UNIQUE constraint course_student çiftine
+- `models/schedule.py` — `Schedule` modeli (eski `Lessons` adı karışıklık yaratıyordu). `latitude`/`longitude`/`radius_m` alanları eklendi (geofence — NFR-05/06)
+- `models/attendance_session.py` — **YENİ** tablo. UUID primary key (FR-13), `current_code` + `code_expires_at` (FR-04), `status` active/ended (FR-12), geofence ve IP bilgileri
+- `models/attendance_record.py` — **YENİ** tablo. Eski `Attendance` + `Statistics` birleştirildi. `session_id + student_id` UNIQUE constraint (FR-15). Doğrulama alanları: `ip_match`, `gps_match`, `gps_distance_m`. Override alanları: `override_used`, `override_reason` (FR-07). İnceleme alanları: `reviewed_by`, `reviewed_at`, `review_note` (FR-09)
+- `models/verification_log.py` — **YENİ** tablo. Audit trail: her doğrulama adımı loglanır
+
+**Silinen kavramlar (henüz dosyalar silinmedi, Adım 12'de silinecek):**
+- `Auth` modeli → Flask session yeterli
+- `Statistics` modeli → Sorguyla hesaplanacak
+- `Attendance` modeli → `AttendanceRecord` ile değiştirildi
+- Model'lerdeki statik metotlar (login, register, create, mark_attendance vs.) → Service katmanına taşınacak
+
+**Test:** 7 tablo sorunsuz oluştu: `users`, `courses`, `course_students`, `schedules`, `attendance_sessions`, `attendance_records`, `verification_logs`. Nesne oluşturma, relationship erişimi ve duplicate constraint kontrolü başarılı.
+
+---
+
 *Sonraki adımlar bu dosyaya eklenecektir.*
