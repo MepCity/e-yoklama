@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Panel</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav>
+        <h1>Admin Panel</h1>
+        <ul>
+            <li><a href="{{ url_for('admin.dashboard') }}">Anasayfa</a></li>
+            <li><a href="{{ url_for('admin.students') }}">Öğrenciler</a></li>
+            <li><a href="{{ url_for('admin.teachers') }}">Öğretmenler</a></li>
+            <li><a href="{{ url_for('admin.courses') }}">Dersler</a></li>
+            <li><a href="{{ url_for('admin.statistics') }}">İstatistikler</a></li>
+            <li><a href="{{ url_for('auth.logout') }}">Çıkış</a></li>
+        </ul>
+    </nav>
+    <div class="container">
+        <h2>Hoş geldiniz, {{ session.user.username }}!</h2>
+        <p>Admin panelinden tüm kullanıcıları ve dersleri yönetebilirsiniz.</p>
+        
+        <div class="cards">
+            <div class="card">
+                <h3>Öğrenciler</h3>
+                <p>Tüm öğrencileri görüntüle, sırala ve grupla</p>
+                <a href="{{ url_for('admin.students') }}" class="btn">Git</a>
+            </div>
+            <div class="card">
+                <h3>Öğretmenler</h3>
+                <p>Öğretmen ekle ve yönet</p>
+                <a href="{{ url_for('admin.teachers') }}" class="btn">Git</a>
+            </div>
+            <div class="card">
+                <h3>Dersler</h3>
+                <p>Ders oluştur, öğrenci ekle</p>
+                <a href="{{ url_for('admin.courses') }}" class="btn">Git</a>
+            </div>
+            <div class="card">
+                <h3>İstatistikler</h3>
+                <p>Tüm istatistikleri görüntüle</p>
+                <a href="{{ url_for('admin.statistics') }}" class="btn">Git</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

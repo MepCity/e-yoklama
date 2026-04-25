@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Öğretmenler - Admin Panel</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav>
+        <h1>Admin Panel</h1>
+        <ul>
+            <li><a href="{{ url_for('admin.dashboard') }}">Anasayfa</a></li>
+            <li><a href="{{ url_for('admin.students') }}">Öğrenciler</a></li>
+            <li><a href="{{ url_for('admin.teachers') }}">Öğretmenler</a></li>
+            <li><a href="{{ url_for('admin.courses') }}">Dersler</a></li>
+            <li><a href="{{ url_for('admin.statistics') }}">İstatistikler</a></li>
+            <li><a href="{{ url_for('auth.logout') }}">Çıkış</a></li>
+        </ul>
+    </nav>
+    <div class="container">
+        <h2>Öğretmen Yönetimi</h2>
+        
+        <div class="form-section">
+            <h3>Yeni Öğretmen Ekle</h3>
+            <form method="POST" action="{{ url_for('admin.add_teacher') }}">
+                <input type="text" name="username" placeholder="Kullanıcı Adı" required>
+                <input type="email" name="email" placeholder="E-posta" required>
+                <input type="password" name="password" placeholder="Şifre" required>
+                <input type="text" name="branch" placeholder="Branş">
+                <button type="submit">Öğretmen Ekle</button>
+            </form>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Kullanıcı Adı</th>
+                    <th>E-posta</th>
+                    <th>Branş</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for teacher in teachers %}
+                <tr>
+                    <td>{{ teacher.username }}</td>
+                    <td>{{ teacher.email }}</td>
+                    <td>{{ teacher.branch or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

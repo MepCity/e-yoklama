@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>İstatistikler - Öğrenci</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav>
+        <h1>Öğrenci Panel</h1>
+        <ul>
+            <li><a href="{{ url_for('student.dashboard') }}">Anasayfa</a></li>
+            <li><a href="{{ url_for('student.security_check') }}">Yoklama Al</a></li>
+            <li><a href="{{ url_for('student.statistics') }}">İstatistikler</a></li>
+            <li><a href="{{ url_for('auth.logout') }}">Çıkış</a></li>
+        </ul>
+    </nav>
+    <div class="container">
+        <h2>Yoklama İstatistikleriniz</h2>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Toplam Yoklama</h3>
+                <p class="stat-number">{{ total }}</p>
+            </div>
+            <div class="stat-card success">
+                <h3>Katıldığım</h3>
+                <p class="stat-number">{{ present }}</p>
+            </div>
+            <div class="stat-card error">
+                <h3>Katılmadığım</h3>
+                <p class="stat-number">{{ absent }}</p>
+            </div>
+            <div class="stat-card">
+                <h3>Katılım Oranı</h3>
+                <p class="stat-number">%{{ "%.1f"|format(attendance_rate) }}</p>
+            </div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>İzinli</h3>
+                <p class="stat-number">{{ excused }}</p>
+            </div>
+            <div class="stat-card">
+                <h3>Geç</h3>
+                <p class="stat-number">{{ late }}</p>
+            </div>
+        </div>
+        
+        <h3>Ders Bazlı İstatistikler</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Ders</th>
+                    <th>Toplam</th>
+                    <th>Katıldım</th>
+                    <th>Katılmadım</th>
+                    <th>Oran</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cid, stat in course_stats.items() %}
+                <tr>
+                    <td>{{ stat.name }}</td>
+                    <td>{{ stat.total }}</td>
+                    <td>{{ stat.present }}</td>
+                    <td>{{ stat.absent }}</td>
+                    <td>%{{ "%.1f"|format((stat.present / stat.total * 100) if stat.total > 0 else 0) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

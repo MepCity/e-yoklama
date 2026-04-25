@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Auth</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>E-Yoklama Auth</h1>
+        <div class="tabs">
+            <button class="tablink" onclick="openTab('login')">Giriş Yap</button>
+            <button class="tablink" onclick="openTab('register')">Kayıt Ol</button>
+            <button class="tablink" onclick="openTab('forgot')">Şifremi Unuttum</button>
+        </div>
+
+        <div id="login" class="tabcontent">
+            <form method="POST" action="{{ url_for('auth.login_page') }}">
+                <input type="text" name="username" placeholder="Kullanıcı Adı" required>
+                <input type="password" name="password" placeholder="Şifre" required>
+                <button type="submit">Giriş Yap</button>
+            </form>
+        </div>
+
+        <div id="register" class="tabcontent">
+            <form method="POST" action="{{ url_for('auth.register') }}">
+                <input type="text" name="username" placeholder="Kullanıcı Adı" required>
+                <input type="email" name="email" placeholder="E-posta" required>
+                <input type="password" name="password" placeholder="Şifre" required>
+                <input type="text" name="student_number" placeholder="Öğrenci Numarası" required>
+                <input type="text" name="department" placeholder="Bölüm" required>
+                <input type="text" name="class_name" placeholder="Sınıf" required>
+                <button type="submit">Kayıt Ol</button>
+            </form>
+        </div>
+
+        <div id="forgot" class="tabcontent">
+            <form method="POST" action="{{ url_for('auth.forgot_password') }}">
+                <input type="email" name="email" placeholder="E-posta" required>
+                <button type="submit">Şifre Sıfırla</button>
+            </form>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <ul class="flashes">
+                {% for category, message in messages %}
+                    <li class="{{ category }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

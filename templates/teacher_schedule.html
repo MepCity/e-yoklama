@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Ders Programı - Öğretmen</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav>
+        <h1>Öğretmen Panel</h1>
+        <ul>
+            <li><a href="{{ url_for('teacher.dashboard') }}">Anasayfa</a></li>
+            <li><a href="{{ url_for('teacher.statistics') }}">İstatistikler</a></li>
+            <li><a href="{{ url_for('auth.logout') }}">Çıkış</a></li>
+        </ul>
+    </nav>
+    <div class="container">
+        <h2>{{ course.name }} - Ders Programı</h2>
+        
+        <div class="form-section">
+            <h3>Yeni Ders Saati Ekle</h3>
+            <form method="POST" action="{{ url_for('teacher.course_schedule', course_id=course.id) }}">
+                <select name="day_of_week" required>
+                    <option value="0">Pazartesi</option>
+                    <option value="1">Salı</option>
+                    <option value="2">Çarşamba</option>
+                    <option value="3">Perşembe</option>
+                    <option value="4">Cuma</option>
+                    <option value="5">Cumartesi</option>
+                    <option value="6">Pazar</option>
+                </select>
+                <input type="time" name="start_time" required>
+                <input type="time" name="end_time" required>
+                <input type="text" name="room" placeholder="Salon">
+                <button type="submit">Ekle</button>
+            </form>
+        </div>
+        
+        <h3>Mevcut Ders Saatleri</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Gün</th>
+                    <th>Başlangıç</th>
+                    <th>Bitiş</th>
+                    <th>Salon</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lesson in schedule %}
+                <tr>
+                    <td>{{ ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'][lesson.day_of_week] }}</td>
+                    <td>{{ lesson.start_time }}</td>
+                    <td>{{ lesson.end_time }}</td>
+                    <td>{{ lesson.room or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

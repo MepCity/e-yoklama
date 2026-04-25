@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Yoklama Paylaş - Öğretmen</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav>
+        <h1>Öğretmen Panel</h1>
+        <ul>
+            <li><a href="{{ url_for('teacher.dashboard') }}">Anasayfa</a></li>
+            <li><a href="{{ url_for('teacher.statistics') }}">İstatistikler</a></li>
+            <li><a href="{{ url_for('auth.logout') }}">Çıkış</a></li>
+        </ul>
+    </nav>
+    <div class="container">
+        <h2>{{ course.name }} - Yoklama</h2>
+        
+        <div class="qr-section">
+            <h3>QR Kod</h3>
+            <p>Öğrenciler bu kodu tarayarak yoklama verebilirler:</p>
+            <div class="qr-code">{{ qr_token }}</div>
+            <p class="qr-hint">Bu kod 15 dakika geçerli olacaktır.</p>
+        </div>
+        
+        <h3>Yoklama Kayıtları</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Öğrenci ID</th>
+                    <th>Tarih</th>
+                    <th>Durum</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for att in attendances %}
+                <tr>
+                    <td>{{ att.student_id }}</td>
+                    <td>{{ att.date.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>
+                        {% if att.status == 1 %}
+                        <span class="status-present">Var</span>
+                        {% elif att.status == 0 %}
+                        <span class="status-absent">Yok</span>
+                        {% elif att.status == 2 %}
+                        <span class="status-excused">İzinli</span>
+                        {% else %}
+                        <span class="status-late">Geç</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
