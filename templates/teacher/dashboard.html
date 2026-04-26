@@ -11,6 +11,9 @@
         <p>{{ c.code or '' }} — {{ c.department or '' }}</p>
         <div class="card-actions">
             <a href="{{ url_for('teacher.course_schedule', course_id=c.id) }}" class="btn btn-small">Ders Programi</a>
+            {% if c.id in active_sessions %}
+            <a href="{{ url_for('teacher.active_session', session_id=active_sessions[c.id]) }}" class="btn btn-small btn-primary">Aktif Yoklama</a>
+            {% endif %}
         </div>
     </div>
     {% endfor %}

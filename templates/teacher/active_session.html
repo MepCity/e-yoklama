@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block title %}Yoklama Oturumu — {{ att_session.course.name }}{% endblock %}
+{% block content %}
+<h1>{{ att_session.course.name }} <small>({{ att_session.course.code or '' }})</small></h1>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>{{ att_session.status|upper }}</h3>
+        <p>Oturum Durumu</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ records|length }}</h3>
+        <p>Katilim / {{ enrolled_count }} kayitli</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ att_session.code_refresh_seconds }}sn</h3>
+        <p>Kod Yenileme Suresi</p>
+    </div>
+</div>
+
+{% if att_session.status == 'active' %}
+<div class="qr-section">
+    <h2>Yoklama Kodu</h2>
+    <div class="qr-code" id="currentCode">{{ att_session.current_code }}</div>
+    {% if qr_base64 %}
+    <div>
+        <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR Kod" style="max-width: 250px;">
+    </div>
+    {% endif %}
+    <p class="qr-hint">Kod her {{ att_session.code_refresh_seconds }} saniyede yenilenir. Ogrenciler bu kodu girerek yoklamaya katilabilir.</p>
+</div>
+
+<div style="text-align: center; margin: 20px 0;">
+    <form method="POST" action="{{ url_for('teacher.end_session', session_id=att_session.id) }}" style="display: inline;">
+        <button type="submit" class="btn btn-danger" onclick="return confirm('Yoklama oturumunu sonlandirmak istediginize emin misiniz?')">Oturumu Sonlandir</button>
+    </form>
+</div>
+{% else %}
+<div class="card" style="text-align: center;">
+    <p>Bu oturum <strong>{{ att_session.ended_at }}</strong> tarihinde sonlandirilmistir.</p>
+</div>
+{% endif %}
+
+<h2>Katilim Listesi</h2>
+{% if records %}
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>Ogrenci No</th>
+                <th>Ad</th>
+                <th>Durum</th>
+                <th>Saat</th>
+                <th>IP</th>
+                <th>IP Eslesmesi</th>
+                <th>GPS Eslesmesi</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in records %}
+            <tr>
+                <td>{{ r.student.student_number or '-' }}</td>
+                <td>{{ r.student.username }}</td>
+                <td>
+                    <span class="status-{{ r.status }}">{{ STATUS_LABELS.get(r.status, r.status) }}</span>
+                </td>
+                <td>{{ format_datetime(r.submitted_at) }}</td>
+                <td>{{ r.ip_address or '-' }}</td>
+                <td>{% if r.ip_match == 1 %}Evet{% elif r.ip_match == 0 %}Hayir{% else %}-{% endif %}</td>
+                <td>{% if r.gps_match == 1 %}Evet{% elif r.gps_match == 0 %}Hayir ({{ r.gps_distance_m|round(0) }}m){% else %}-{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p>Henuz katilim kaydi yok.</p>
+{% endif %}
+
+<a href="{{ url_for('teacher.course_schedule', course_id=att_session.course_id) }}" class="btn">Ders Programina Don</a>
+{% endblock %}

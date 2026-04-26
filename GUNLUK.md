@@ -389,7 +389,128 @@ Adım 1-6 tamamlandı. Faz 0 (Altyapı) büyük ölçüde tamamlanmış durumda:
 - [x] CSS — Responsive tasarım
 - [x] Auth sistemi — Service + view + template
 
-**Sonraki hedef:** Faz 1 — Yoklama oturum yaşam döngüsü (start/end), attendance_service.py
+**Sonraki hedef:** ~~Faz 1 — Yoklama oturum yaşam döngüsü~~ → Tamamlandı (aşağıya bakınız)
+
+---
+
+### 10. Faz 1 — Yoklama Oturum Yaşam Döngüsü + Minimal Seed (Tamamlandı)
+
+**Tarih:** 2026-04-26
+
+**Kapsam:** FR-12 (oturum sonlandırma), FR-13 (UUID tabanlı oturum kimliği), minimal seed data
+
+#### 10.1. attendance_service.py — Yoklama Oturum Servisi
+
+**Dosya:** `services/attendance_service.py` — **YENİ**
+
+**Fonksiyonlar:**
+- `_generate_code(length=6)` — `secrets.choice()` ile kriptografik güvenli 6 haneli alfanümerik kod üretir (A-Z + 0-9)
+- `start_session(course_id, teacher_id, ...)` — Yeni yoklama oturumu başlatır:
+  - Aynı ders için aktif oturum varsa engeller
+  - Dersin o öğretmene ait olduğunu doğrular
+  - UUID primary key oluşturur (FR-13)
+  - İlk kodu üretir, expire süresini ayarlar
+  - Geofence ve IP ayarlarını kaydeder
+  - `(session, None)` veya `(None, error_message)` döner
+- `end_session(session_id, teacher_id)` — Oturumu sonlandırır (FR-12):
+  - Sahiplik kontrolü yapar
+  - `status='ended'`, `ended_at` kaydeder
+  - Tekrar sonlandırmayı engeller
+- `get_active_session(course_id)` — Bir dersin aktif oturumunu döner
+- `get_session_by_id(session_id)` — UUID ile oturum sorgular
+- `refresh_code(session_id)` — Yeni kod üretir + expire günceller (Faz 2'de WebSocket ile kullanılacak)
+- `get_session_records(session_id)` — Oturuma ait katılım kayıtlarını döner
+- `get_enrolled_count(course_id)` — Derse kayıtlı öğrenci sayısı
+
+#### 10.2. Teacher View Güncellemeleri
+
+**Dosya:** `views/teacher.py` — **Güncellendi**
+
+**Yeni route'lar:**
+- `POST /teacher/course/<id>/start-session` — Yoklama başlatma formu işler. Config'den veya formdan: refresh_seconds, allowed_ip_prefix, latitude/longitude, radius_m. Başarılı olursa aktif oturum sayfasına yönlendirir.
+- `GET /teacher/session/<session_id>` — Aktif oturum sayfası: QR kodu + alfanümerik kod + katılım listesi + istatistikler. QR base64 olarak generate edilir.
+- `POST /teacher/session/<session_id>/end` — Oturumu sonlandırır, aynı sayfaya yönlendirir (artık "sonlandırılmış" olarak gösterilir).
+
+**Güncellenen route'lar:**
+- `GET /teacher/dashboard` — Artık aktif oturumları da gönderir → template'te "Aktif Yoklama" butonu
+- `GET /teacher/course/<id>/schedule` — Aktif oturum varsa "Aktif Oturuma Git" linki, yoksa "Yoklama Başlat" formu gösterir
+
+#### 10.3. Template Güncellemeleri
+
+- `templates/teacher/active_session.html` — **YENİ.** Aktif yoklama oturum sayfası:
+  - Üstte 3 stat kartı: oturum durumu, katılım/kayıtlı sayısı, kod yenileme süresi
+  - Ortada QR bölümü: QR görsel (base64 PNG) + alfanümerik kod + bilgi mesajı
+  - "Oturumu Sonlandır" butonu (confirm dialog ile)
+  - Sonlandırılmış oturumlar için bilgi mesajı
+  - Altta katılım tablosu: öğrenci no, ad, durum (renkli), saat, IP, IP/GPS eşleşme bilgisi
+- `templates/teacher/schedule.html` — **Güncellendi.** "Yoklama Oturumu" bölümü eklendi: aktif oturum varsa link, yoksa başlatma formu (ders saati seçimi, kod yenileme süresi, IP filtresi)
+- `templates/teacher/dashboard.html` — **Güncellendi.** Aktif yoklama olan derslerde "Aktif Yoklama" butonu
+
+#### 10.4. Minimal Seed Data
+
+**Dosya:** `seed.py` — **Tamamen yeniden yazıldı**
+
+Eski seed eski modül yapısını kullanıyordu (`databases.dbconnect`, `controllers.hash`). Yeni mimariyle uyumlu ORM tabanlı seed:
+
+**Oluşturulan veriler:**
+- 1 admin: `admin / admin123`
+- 2 öğretmen: `ogretmen1 / ogretmen123` (Yazılım Müh.), `ogretmen2 / ogretmen123` (Veri Tabanı)
+- 10 öğrenci: `ogrenci1~10 / ogrenci123` (2 bölüm × 5 öğrenci)
+- 3 ders: YZM301 (öğretmen1, 5 öğrenci), VTY201 (öğretmen2, 3 öğrenci), ALG401 (öğretmen1, 5 öğrenci)
+- 3 ders programı: Pazartesi, Çarşamba, Perşembe
+- 1 ders programında geofence: YZM301 D-301 (40.9833, 29.0500, 100m)
+
+**Kullanım:** `python3 seed.py` — DB'yi sıfırlar ve yeniden oluşturur.
+
+#### 10.5. Diğer Düzeltmeler
+
+- `wsgi.py` — Port 5050'ye değiştirildi (macOS AirPlay 5000'i kullanıyor). `allow_unsafe_werkzeug=True` eklendi (geliştirme modu).
+
+#### 10.6. Testler
+
+**Birim testleri (10/10 başarılı):**
+1. Kod üretimi (6 karakter, alfanümerik)
+2. Oturum başlatma (UUID pk, initial code, status=active)
+3. Aynı derse çift oturum engeli
+4. Aktif oturum sorgulama
+5. UUID ile oturum getirme
+6. Kod yenileme (eski ≠ yeni)
+7. Kayıtlı öğrenci sayısı
+8. Boş kayıt listesi
+9. Oturum sonlandırma (status=ended, ended_at set)
+10. Tekrar sonlandırma engeli
+
+**HTTP entegrasyon testleri (tam döngü):**
+1. `POST /login` → 302 (giriş başarılı)
+2. `GET /teacher/dashboard` → 200, "Ders Programı" linkleri mevcut
+3. `GET /teacher/course/1/schedule` → 200, "Yoklamayı Başlat" butonu mevcut
+4. `POST /teacher/course/1/start-session` → 302 → aktif oturum sayfasına yönlendirme
+5. `GET /teacher/session/<uuid>` → 200, QR kodu + "Katılım / 5 kayıtlı" + QR görseli
+6. `GET /teacher/dashboard` → "Aktif Yoklama" butonu görünür
+7. `POST /teacher/session/<uuid>/end` → 302 → oturum sayfası "sonlandırılmıştır"
+8. `GET /teacher/course/1/schedule` → "Yoklamayı Başlat" tekrar görünür
+
+**Toplam route sayısı:** 22 (önceki 18 + 4 yeni)
+
+---
+
+### Revize Faz Sıralaması
+
+Faz 1 tamamlandıktan sonra diğer AI'ın önerisiyle sıralama revize edildi:
+
+| Faz | İçerik | Durum |
+|-----|--------|-------|
+| **Faz 1** | Yoklama oturum başlat/bitir + minimal seed | **TAMAMLANDI** |
+| **Faz 2** | Dinamik QR kod + süreli kod doğrulama | Bekliyor |
+| **Faz 3** | Öğrenci yoklama akışı + duplicate check (FR-15) | Bekliyor |
+| **Faz 4** | IP/GPS doğrulama + "Yine de Devam Et" (FR-06, FR-07) | Bekliyor |
+| **Faz 5** | Şüpheli yoklama yönetimi — öğretmen onay/ret (FR-08, FR-09) | Bekliyor |
+| **Faz 6** | İstatistikleri gerçek veriye dayandır + Chart.js (FR-14) | Bekliyor |
+| **Faz 7** | Excel export (FR-11) | Bekliyor |
+| **Faz 8** | Güvenlik: rate limit, session timeout, expired code | Bekliyor |
+| **Faz 9** | Responsive UI cilası + Türkçe lokalizasyon | Bekliyor |
+| **Faz 10** | Offline destek (FR-23) | Bekliyor |
+| **Faz 11** | Entegrasyon testi + final cleanup | Bekliyor |
 
 ---
 
