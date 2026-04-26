@@ -3,10 +3,7 @@ from utils.decorators import role_required
 from database import db
 from models.user import User
 from models.course import Course, CourseStudent
-from models.schedule import Schedule
-from models.attendance_record import AttendanceRecord
-from services import auth_service
-from sqlalchemy import func
+from services import auth_service, statistics_service
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -134,27 +131,5 @@ def add_student_to_course():
 @admin_bp.route('/statistics')
 @role_required(0)
 def statistics():
-    total_students = db.query(User).filter(User.role == 2).count()
-    total_teachers = db.query(User).filter(User.role == 1).count()
-    total_courses = db.query(Course).count()
-    total_records = db.query(AttendanceRecord).count()
-
-    verified_count = db.query(AttendanceRecord).filter(
-        AttendanceRecord.status.in_(['verified', 'approved', 'manual'])
-    ).count()
-    absent_count = db.query(AttendanceRecord).filter(
-        AttendanceRecord.status == 'rejected'
-    ).count()
-
-    dept_stats = db.query(User.department, func.count(User.id)).filter(
-        User.role == 2, User.department.isnot(None)
-    ).group_by(User.department).all()
-
-    return render_template('admin/statistics.html',
-                           total_students=total_students,
-                           total_teachers=total_teachers,
-                           total_courses=total_courses,
-                           total_records=total_records,
-                           verified_count=verified_count,
-                           absent_count=absent_count,
-                           dept_stats=dept_stats)
+    stats = statistics_service.get_admin_statistics()
+    return render_template('admin/statistics.html', **stats)

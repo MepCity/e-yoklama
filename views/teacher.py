@@ -4,9 +4,7 @@ from utils.qr_generator import generate_qr_base64
 from database import db
 from models.course import Course
 from models.schedule import Schedule
-from models.attendance_record import AttendanceRecord
-from models.attendance_session import AttendanceSession
-from services import attendance_service
+from services import attendance_service, statistics_service
 
 teacher_bp = Blueprint('teacher', __name__)
 
@@ -153,22 +151,5 @@ def resolve_suspicious(record_id):
 @role_required(1)
 def statistics():
     user_id = session['user']['id']
-    my_courses = db.query(Course).filter(Course.teacher_id == user_id).all()
-
-    course_stats = []
-    for course in my_courses:
-        total = db.query(AttendanceRecord).filter(AttendanceRecord.course_id == course.id).count()
-        present = db.query(AttendanceRecord).filter(
-            AttendanceRecord.course_id == course.id,
-            AttendanceRecord.status.in_(['verified', 'approved', 'manual'])
-        ).count()
-        rate = (present / total * 100) if total > 0 else 0
-        course_stats.append({
-            'course': course,
-            'total': total,
-            'present': present,
-            'absent': total - present,
-            'rate': round(rate, 1),
-        })
-
-    return render_template('teacher/statistics.html', course_stats=course_stats)
+    stats = statistics_service.get_teacher_statistics(user_id)
+    return render_template('teacher/statistics.html', **stats)

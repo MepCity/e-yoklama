@@ -206,6 +206,27 @@ button[type="submit"] {
     margin: 8px 0;
 }
 
+/* ===== Charts ===== */
+.chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin: 16px 0 24px;
+}
+
+.chart-panel {
+    min-height: 280px;
+    padding: 16px;
+    border: 1px solid #e1e4e8;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.chart-panel canvas {
+    width: 100% !important;
+    max-height: 320px;
+}
+
 /* ===== Forms ===== */
 label {
     display: block;

@@ -10,7 +10,8 @@
         <h3>{{ cs.course.name }}</h3>
         <p class="stat-number">%{{ cs.rate }}</p>
         <p>Katilim Orani</p>
-        <p>{{ cs.present }} katilim / {{ cs.total }} toplam</p>
+        <p>{{ cs.present }} katilim / {{ cs.total }} beklenen</p>
+        <p>{{ cs.session_count }} oturum, {{ cs.enrolled_count }} kayitli</p>
     </div>
     {% endfor %}
 </div>
@@ -21,8 +22,12 @@
         <thead>
             <tr>
                 <th>Ders</th>
-                <th>Toplam Kayit</th>
+                <th>Oturum</th>
+                <th>Kayitli</th>
+                <th>Beklenen</th>
+                <th>Girilen</th>
                 <th>Katilim</th>
+                <th>Supheli</th>
                 <th>Devamsiz</th>
                 <th>Oran</th>
             </tr>
@@ -31,8 +36,12 @@
             {% for cs in course_stats %}
             <tr>
                 <td>{{ cs.course.name }} ({{ cs.course.code or '-' }})</td>
+                <td>{{ cs.session_count }}</td>
+                <td>{{ cs.enrolled_count }}</td>
                 <td>{{ cs.total }}</td>
+                <td>{{ cs.submitted }}</td>
                 <td>{{ cs.present }}</td>
+                <td>{{ cs.suspicious }}</td>
                 <td>{{ cs.absent }}</td>
                 <td>%{{ cs.rate }}</td>
             </tr>
@@ -57,17 +66,22 @@
 {% if course_stats %}
 <script>
 const ctx = document.getElementById('attendanceChart').getContext('2d');
+const chartData = {{ chart_data|tojson }};
 new Chart(ctx, {
     type: 'bar',
     data: {
-        labels: [{% for cs in course_stats %}'{{ cs.course.name }}'{% if not loop.last %},{% endif %}{% endfor %}],
+        labels: chartData.labels,
         datasets: [{
             label: 'Katilim',
-            data: [{% for cs in course_stats %}{{ cs.present }}{% if not loop.last %},{% endif %}{% endfor %}],
+            data: chartData.present,
             backgroundColor: '#27ae60'
         }, {
+            label: 'Supheli',
+            data: chartData.suspicious,
+            backgroundColor: '#f39c12'
+        }, {
             label: 'Devamsiz',
-            data: [{% for cs in course_stats %}{{ cs.absent }}{% if not loop.last %},{% endif %}{% endfor %}],
+            data: chartData.absent,
             backgroundColor: '#e74c3c'
         }]
     },

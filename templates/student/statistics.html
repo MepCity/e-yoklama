@@ -6,11 +6,15 @@
 <div class="stats-grid">
     <div class="stat-card">
         <h3>{{ total }}</h3>
-        <p>Toplam Yoklama</p>
+        <p>Beklenen Yoklama</p>
     </div>
     <div class="stat-card">
         <h3>{{ present }}</h3>
         <p>Katilim</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ suspicious }}</h3>
+        <p>Supheli</p>
     </div>
     <div class="stat-card">
         <h3>{{ absent }}</h3>
@@ -29,8 +33,10 @@
         <thead>
             <tr>
                 <th>Ders</th>
-                <th>Toplam</th>
+                <th>Beklenen</th>
+                <th>Girilen</th>
                 <th>Katilim</th>
+                <th>Supheli</th>
                 <th>Devamsiz</th>
                 <th>Oran</th>
             </tr>
@@ -38,11 +44,13 @@
         <tbody>
             {% for cid, st in course_stats.items() %}
             <tr>
-                <td>{{ st.name }}</td>
+                <td>{{ st.name }} ({{ st.code or '-' }})</td>
                 <td>{{ st.total }}</td>
+                <td>{{ st.submitted }}</td>
                 <td>{{ st.present }}</td>
+                <td>{{ st.suspicious }}</td>
                 <td>{{ st.absent }}</td>
-                <td>%{{ (st.present / st.total * 100)|round(1) if st.total > 0 else 0 }}</td>
+                <td>%{{ st.rate }}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -51,8 +59,13 @@
 
 {% if course_stats|length > 0 %}
 <h2>Katilim Grafigi</h2>
-<div style="max-width: 600px; margin: 20px auto;">
-    <canvas id="studentChart"></canvas>
+<div class="chart-grid">
+    <div class="chart-panel">
+        <canvas id="studentChart"></canvas>
+    </div>
+    <div class="chart-panel">
+        <canvas id="studentRateChart"></canvas>
+    </div>
 </div>
 {% endif %}
 
@@ -65,16 +78,34 @@
 {% if course_stats %}
 <script>
 const ctx = document.getElementById('studentChart').getContext('2d');
+const chartData = {{ chart_data|tojson }};
 new Chart(ctx, {
     type: 'doughnut',
     data: {
-        labels: ['Katilim', 'Devamsiz'],
+        labels: chartData.labels,
         datasets: [{
-            data: [{{ present }}, {{ absent }}],
-            backgroundColor: ['#27ae60', '#e74c3c']
+            data: chartData.data,
+            backgroundColor: chartData.colors
         }]
     },
     options: { responsive: true }
+});
+
+const courseRateData = {{ course_rate_chart|tojson }};
+new Chart(document.getElementById('studentRateChart'), {
+    type: 'bar',
+    data: {
+        labels: courseRateData.labels,
+        datasets: [{
+            label: 'Katilim Orani (%)',
+            data: courseRateData.data,
+            backgroundColor: '#3498db'
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true, max: 100 } }
+    }
 });
 </script>
 {% endif %}

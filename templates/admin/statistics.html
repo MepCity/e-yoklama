@@ -17,10 +17,89 @@
         <p>Toplam Ders</p>
     </div>
     <div class="stat-card">
+        <h3>{{ total_sessions }}</h3>
+        <p>Yoklama Oturumu</p>
+    </div>
+    <div class="stat-card">
         <h3>{{ total_records }}</h3>
-        <p>Toplam Yoklama Kaydi</p>
+        <p>Girilen Yoklama Kaydi</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ total_expected }}</h3>
+        <p>Beklenen Yoklama</p>
+    </div>
+    <div class="stat-card">
+        <h3>%{{ attendance_rate }}</h3>
+        <p>Genel Katilim Orani</p>
     </div>
 </div>
+
+<h2>Yoklama Durum Dagilimi</h2>
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>{{ verified_count }}</h3>
+        <p>Katilim</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ suspicious_count }}</h3>
+        <p>Supheli</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ rejected_count }}</h3>
+        <p>Reddedilen</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ missed_count }}</h3>
+        <p>Girilmemis</p>
+    </div>
+</div>
+
+{% if total_expected > 0 %}
+<div class="chart-grid">
+    <div class="chart-panel">
+        <h2>Durum Grafigi</h2>
+        <canvas id="statusChart"></canvas>
+    </div>
+    <div class="chart-panel">
+        <h2>Ders Katilim Oranlari</h2>
+        <canvas id="courseRateChart"></canvas>
+    </div>
+</div>
+{% endif %}
+
+{% if course_stats %}
+<h2>Ders Bazli Ozet</h2>
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>Ders</th>
+                <th>Oturum</th>
+                <th>Kayitli</th>
+                <th>Beklenen</th>
+                <th>Katilim</th>
+                <th>Supheli</th>
+                <th>Devamsiz</th>
+                <th>Oran</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cs in course_stats %}
+            <tr>
+                <td>{{ cs.course.name }} ({{ cs.course.code or '-' }})</td>
+                <td>{{ cs.session_count }}</td>
+                <td>{{ cs.enrolled_count }}</td>
+                <td>{{ cs.total }}</td>
+                <td>{{ cs.present }}</td>
+                <td>{{ cs.suspicious }}</td>
+                <td>{{ cs.absent }}</td>
+                <td>%{{ cs.rate }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
 
 {% if dept_stats %}
 <h2>Bolum Bazli Ogrenci Dagilimi</h2>
@@ -36,5 +115,41 @@
         </tbody>
     </table>
 </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if total_expected > 0 %}
+<script>
+const statusChartData = {{ status_chart|tojson }};
+new Chart(document.getElementById('statusChart'), {
+    type: 'doughnut',
+    data: {
+        labels: statusChartData.labels,
+        datasets: [{
+            data: statusChartData.data,
+            backgroundColor: statusChartData.colors
+        }]
+    },
+    options: { responsive: true }
+});
+
+const courseRateData = {{ course_rate_chart|tojson }};
+new Chart(document.getElementById('courseRateChart'), {
+    type: 'bar',
+    data: {
+        labels: courseRateData.labels,
+        datasets: [{
+            label: 'Katilim Orani (%)',
+            data: courseRateData.data,
+            backgroundColor: '#3498db'
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true, max: 100 } }
+    }
+});
+</script>
 {% endif %}
 {% endblock %}

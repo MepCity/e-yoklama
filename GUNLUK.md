@@ -505,7 +505,7 @@ Faz 1 tamamlandıktan sonra diğer AI'ın önerisiyle sıralama revize edildi:
 | **Faz 3** | Öğrenci yoklama akışı + duplicate check (FR-15) | **TAMAMLANDI** |
 | **Faz 4** | IP/GPS doğrulama + "Yine de Devam Et" (FR-06, FR-07) | **TAMAMLANDI** |
 | **Faz 5** | Şüpheli yoklama yönetimi — öğretmen onay/ret (FR-08, FR-09) | **TAMAMLANDI** |
-| **Faz 6** | İstatistikleri gerçek veriye dayandır + Chart.js (FR-14) | Bekliyor |
+| **Faz 6** | İstatistikleri gerçek veriye dayandır + Chart.js (FR-14) | **TAMAMLANDI** |
 | **Faz 7** | Excel export (FR-11) | Bekliyor |
 | **Faz 8** | Güvenlik: rate limit, session timeout, expired code | Bekliyor |
 | **Faz 9** | Responsive UI cilası + Türkçe lokalizasyon | Bekliyor |
@@ -721,6 +721,50 @@ Karar sonucu:
 - Sahip olmayan öğretmenin inceleme yapması engellendi.
 - Aynı kayıt ikinci kez incelenemedi.
 - HTTP testi: öğretmen aktif oturum sayfasında şüpheli tabloyu gördü, POST ile onay kararı kayda işlendi.
+
+---
+
+### 16. Faz 6 — İstatistikler + Chart.js Grafikleri (Tamamlandı)
+
+**Tarih:** 2026-04-26
+
+**Kapsam:** FR-14 — Admin, öğretmen ve öğrenci istatistiklerinin gerçek yoklama verisine dayandırılması ve grafiklerle gösterilmesi.
+
+#### 16.1. Statistics Service
+
+**Dosya:** `services/statistics_service.py` — **YENİ**
+
+Eklenen hesaplamalar:
+- Beklenen yoklama sayısı: `yoklama oturumu x kayıtlı öğrenci`.
+- Katılım: `verified`, `approved`, `manual`.
+- Şüpheli: `suspicious`.
+- Reddedilen: `rejected`.
+- Girilmemiş/devamsız: Beklenen yoklama olup hiç kayıt oluşmayan durumlar.
+- Katılım oranı: Katılım / beklenen yoklama.
+
+Bu değişiklikle sadece oluşmuş kayıtları sayan eski yaklaşım bırakıldı; hiç yoklama vermeyen öğrenciler de devamsızlık hesabına dahil edildi.
+
+#### 16.2. Route Güncellemeleri
+
+**Dosyalar:**
+- `views/admin.py` — Sistem istatistikleri `statistics_service.get_admin_statistics()` üzerinden alınır.
+- `views/teacher.py` — Öğretmen ders istatistikleri `statistics_service.get_teacher_statistics()` üzerinden alınır.
+- `views/student.py` — Öğrenci kişisel istatistikleri `statistics_service.get_student_statistics()` üzerinden alınır.
+
+#### 16.3. Template + Grafik Güncellemeleri
+
+**Dosyalar:**
+- `templates/admin/statistics.html` — Durum dağılımı doughnut grafik, ders bazlı katılım oranı bar grafik, ders bazlı özet tablo.
+- `templates/teacher/statistics.html` — Katılım/devamsız/şüpheli durumlarını gösteren bar grafik ve detaylı tablo.
+- `templates/student/statistics.html` — Kişisel durum dağılımı doughnut grafik, ders bazlı katılım oranı bar grafik ve detaylı tablo.
+- `static/css/style.css` — Grafik panelleri için responsive `chart-grid` ve `chart-panel` stilleri.
+
+#### 16.4. Testler
+
+**Geçen testler:**
+- `py_compile` başarılı.
+- Servis testi: 2 oturum x 2 öğrenci senaryosunda beklenen yoklama, katılım, şüpheli, reddedilen ve girilmemiş değerleri doğru hesaplandı.
+- HTTP testi: admin/öğretmen/öğrenci istatistik sayfaları 200 döndü ve Chart.js canvas/script verileri render edildi.
 
 ---
 
