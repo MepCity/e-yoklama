@@ -1,5 +1,11 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker, declarative_base
+
+
+def utcnow_str():
+    return datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
 
 engine = None
 Base = declarative_base()

@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
-from database.session import Base
+from database.session import Base, utcnow_str
 
 
 class AttendanceRecord(Base):
@@ -33,7 +33,7 @@ class AttendanceRecord(Base):
     review_note = Column(String(500), nullable=True)
 
     # Zaman
-    submitted_at = Column(Text, nullable=False, server_default='(datetime("now"))')
+    submitted_at = Column(Text, nullable=False, default=utcnow_str)
 
     # FR-15: Ayni ogrenci ayni oturuma iki kez katılamaz
     __table_args__ = (

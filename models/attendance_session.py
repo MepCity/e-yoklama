@@ -1,7 +1,7 @@
 import uuid
 from sqlalchemy import Column, Integer, String, Float, Text, ForeignKey
 from sqlalchemy.orm import relationship
-from database.session import Base
+from database.session import Base, utcnow_str
 
 
 class AttendanceSession(Base):
@@ -29,7 +29,7 @@ class AttendanceSession(Base):
     allowed_ip_prefix = Column(String(50), nullable=True)
 
     # Zaman
-    started_at = Column(Text, nullable=False, server_default='(datetime("now"))')
+    started_at = Column(Text, nullable=False, default=utcnow_str)
     ended_at = Column(Text, nullable=True)
 
     # Relationship'ler

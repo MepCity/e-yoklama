@@ -30,6 +30,7 @@
                 <th>Supheli</th>
                 <th>Devamsiz</th>
                 <th>Oran</th>
+                <th>Indir</th>
             </tr>
         </thead>
         <tbody>
@@ -44,6 +45,7 @@
                 <td>{{ cs.suspicious }}</td>
                 <td>{{ cs.absent }}</td>
                 <td>%{{ cs.rate }}</td>
+                <td><a href="{{ url_for('teacher.export_course', course_id=cs.course.id) }}" class="btn btn-small">Excel</a></td>
             </tr>
             {% endfor %}
         </tbody>

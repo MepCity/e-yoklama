@@ -1,7 +1,10 @@
 {% extends 'base.html' %}
 {% block title %}Istatistikler — E-Yoklama{% endblock %}
 {% block content %}
-<h1>Sistem Istatistikleri</h1>
+<div class="page-actions">
+    <h1>Sistem Istatistikleri</h1>
+    <a href="{{ url_for('admin.export_all') }}" class="btn">Tum Dersleri Excel Indir</a>
+</div>
 
 <div class="stats-grid">
     <div class="stat-card">
@@ -81,6 +84,7 @@
                 <th>Supheli</th>
                 <th>Devamsiz</th>
                 <th>Oran</th>
+                <th>Indir</th>
             </tr>
         </thead>
         <tbody>
@@ -94,6 +98,7 @@
                 <td>{{ cs.suspicious }}</td>
                 <td>{{ cs.absent }}</td>
                 <td>%{{ cs.rate }}</td>
+                <td><a href="{{ url_for('admin.export_course', course_id=cs.course.id) }}" class="btn btn-small">Excel</a></td>
             </tr>
             {% endfor %}
         </tbody>

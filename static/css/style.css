@@ -87,6 +87,19 @@ h2 { font-size: 1.3rem; margin: 24px 0 12px; color: #34495e; }
 h3 { font-size: 1.1rem; margin-bottom: 10px; color: #2c3e50; }
 h1 small { font-size: 0.7em; color: #7f8c8d; font-weight: 400; }
 
+.page-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.page-actions h1 {
+    margin-bottom: 0;
+}
+
 /* ===== Flash Messages ===== */
 .flash-container { margin-bottom: 16px; }
 

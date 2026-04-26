@@ -1,9 +1,9 @@
-from flask import Blueprint, render_template, session, redirect, url_for, request, flash
+from flask import Blueprint, render_template, session, redirect, url_for, request, flash, send_file
 from utils.decorators import role_required
 from database import db
 from models.user import User
 from models.course import Course, CourseStudent
-from services import auth_service, statistics_service
+from services import auth_service, statistics_service, export_service
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -133,3 +133,22 @@ def add_student_to_course():
 def statistics():
     stats = statistics_service.get_admin_statistics()
     return render_template('admin/statistics.html', **stats)
+
+
+@admin_bp.route('/export/all')
+@role_required(0)
+def export_all():
+    buf, filename = export_service.export_all_courses()
+    return send_file(buf, download_name=filename, as_attachment=True,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+@admin_bp.route('/export/course/<int:course_id>')
+@role_required(0)
+def export_course(course_id):
+    result, filename_or_error = export_service.export_course_attendance(course_id)
+    if result is None:
+        flash(filename_or_error, 'error')
+        return redirect(url_for('admin.statistics'))
+    return send_file(result, download_name=filename_or_error, as_attachment=True,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

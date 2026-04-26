@@ -1,10 +1,10 @@
-from flask import Blueprint, render_template, session, redirect, url_for, request, flash, current_app
+from flask import Blueprint, render_template, session, redirect, url_for, request, flash, current_app, send_file
 from utils.decorators import role_required
 from utils.qr_generator import generate_qr_base64
 from database import db
 from models.course import Course
 from models.schedule import Schedule
-from services import attendance_service, statistics_service
+from services import attendance_service, statistics_service, export_service
 
 teacher_bp = Blueprint('teacher', __name__)
 
@@ -153,3 +153,19 @@ def statistics():
     user_id = session['user']['id']
     stats = statistics_service.get_teacher_statistics(user_id)
     return render_template('teacher/statistics.html', **stats)
+
+
+@teacher_bp.route('/export/course/<int:course_id>')
+@role_required(1)
+def export_course(course_id):
+    user_id = session['user']['id']
+    course = db.query(Course).filter_by(id=course_id, teacher_id=user_id).first()
+    if not course:
+        flash('Ders bulunamadi veya yetkiniz yok.', 'error')
+        return redirect(url_for('teacher.statistics'))
+    result, filename_or_error = export_service.export_course_attendance(course_id)
+    if result is None:
+        flash(filename_or_error, 'error')
+        return redirect(url_for('teacher.statistics'))
+    return send_file(result, download_name=filename_or_error, as_attachment=True,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

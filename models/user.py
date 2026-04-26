@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text
 from sqlalchemy.orm import relationship
-from database.session import Base
+from database.session import Base, utcnow_str
 
 
 class User(Base):
@@ -23,7 +23,7 @@ class User(Base):
 
     # Meta
     is_active = Column(Integer, nullable=False, default=1)
-    created_at = Column(Text, nullable=False, server_default='(datetime("now"))')
+    created_at = Column(Text, nullable=False, default=utcnow_str)
 
     # Relationship'ler
     taught_courses = relationship('Course', back_populates='teacher', lazy='dynamic')

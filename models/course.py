@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
-from database.session import Base
+from database.session import Base, utcnow_str
 
 
 class Course(Base):
@@ -15,7 +15,7 @@ class Course(Base):
     class_name = Column(String(50), nullable=True)
     semester = Column(String(30), nullable=True)
     is_active = Column(Integer, nullable=False, default=1)
-    created_at = Column(Text, nullable=False, server_default='(datetime("now"))')
+    created_at = Column(Text, nullable=False, default=utcnow_str)
 
     # Relationship'ler
     teacher = relationship('User', back_populates='taught_courses')
@@ -30,7 +30,7 @@ class CourseStudent(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     course_id = Column(Integer, ForeignKey('courses.id', ondelete='CASCADE'), nullable=False, index=True)
     student_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
-    enrolled_at = Column(Text, nullable=False, server_default='(datetime("now"))')
+    enrolled_at = Column(Text, nullable=False, default=utcnow_str)
 
     __table_args__ = (
         UniqueConstraint('course_id', 'student_id', name='uq_course_student'),
