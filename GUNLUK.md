@@ -507,7 +507,7 @@ Faz 1 tamamlandıktan sonra diğer AI'ın önerisiyle sıralama revize edildi:
 | **Faz 5** | Şüpheli yoklama yönetimi — öğretmen onay/ret (FR-08, FR-09) | **TAMAMLANDI** |
 | **Faz 6** | İstatistikleri gerçek veriye dayandır + Chart.js (FR-14) | **TAMAMLANDI** |
 | **Faz 7** | Excel export (FR-11) | **TAMAMLANDI** |
-| **Faz 8** | Güvenlik: rate limit, session timeout, expired code | Bekliyor |
+| **Faz 8** | Güvenlik: rate limit, session timeout, expired code | **TAMAMLANDI** |
 | **Faz 9** | Responsive UI cilası + Türkçe lokalizasyon | Bekliyor |
 | **Faz 10** | Offline destek (FR-23) | Bekliyor |
 | **Faz 11** | Entegrasyon testi + final cleanup | Bekliyor |
@@ -813,6 +813,59 @@ Excel içeriği:
 - Üretilen `.xlsx` dosyaları `openpyxl` ile açıldı.
 - Girilmemiş yoklama satırları export'a yazıldı.
 - `ALG/401`, `ALG:401` gibi yasak karakterli/çakışan ders kodlarıyla export 500 vermeden çalıştı.
+
+---
+
+### 18. Faz 8 — Güvenlik: Rate Limit + Session Timeout + Expired Code (Tamamlandı)
+
+**Tarih:** 2026-04-26
+
+**Kapsam:** NFR güvenlik gereksinimleri — yoğun istekleri sınırlama, oturum zaman aşımı ve süresi dolmuş yoklama kodlarının reddedilmesi.
+
+#### 18.1. Rate Limiting
+
+**Dosyalar:**
+- `utils/rate_limit.py` — Flask-Limiter instance'ı eklendi.
+- `app.py` — Limiter uygulamaya bağlandı, 429 hata sayfası tanımlandı.
+- `views/auth.py` — Login ve kayıt route'larına rate limit eklendi.
+- `views/student.py` — Yoklama verme route'una rate limit eklendi.
+- `templates/errors/429.html` — Çok fazla istek hata sayfası eklendi.
+
+Config değerleri:
+- `RATE_LIMIT_DEFAULT = '30/minute'`
+- `RATE_LIMIT_LOGIN = '5/minute'`
+- `RATE_LIMIT_REGISTER = '5/minute'`
+- `RATE_LIMIT_ATTEND = '10/minute'`
+
+#### 18.2. Session Timeout
+
+**Dosyalar:**
+- `config.py` — `SESSION_TIMEOUT_MINUTES`, `PERMANENT_SESSION_LIFETIME`, `SESSION_REFRESH_EACH_REQUEST` eklendi.
+- `app.py` — `before_request` ile son aktivite zamanı kontrol edildi.
+- `views/auth.py` — Girişte session permanent yapıldı ve `last_activity_at` set edildi.
+
+Davranış:
+- Kullanıcı 30 dakika pasif kalırsa session temizlenir.
+- Kullanıcı login sayfasına yönlendirilir.
+- Her geçerli request son aktivite zamanını günceller.
+
+#### 18.3. Expired Code + QR Süre Sınırı
+
+Mevcut `attendance_service.check_in()` içindeki süresi dolmuş kod reddi korundu ve test edildi.
+
+**Dosya:** `views/teacher.py`
+- Öğretmenin girdiği QR yenileme süresi config min/max aralığına çekildi.
+- `QR_REFRESH_MIN = 5`, `QR_REFRESH_MAX = 30` sınırları uygulanır.
+
+#### 18.4. Testler
+
+**Geçen testler:**
+- `py_compile` başarılı.
+- Uygulama `create_app('testing')` ile açıldı.
+- Login rate limit: aynı IP'den limit aşılınca 429 döndü.
+- Session timeout: eski `last_activity_at` ile korumalı sayfa login'e yönlendirdi.
+- Expired code rejection: süresi dolmuş kodla yoklama reddedildi.
+- QR refresh clamp: 999 saniye isteyen oturum 30 saniyeye sınırlandı.
 
 ---
 

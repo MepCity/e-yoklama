@@ -63,6 +63,9 @@ def course_schedule(course_id):
 def start_session(course_id):
     user_id = session['user']['id']
     refresh_seconds = request.form.get('refresh_seconds', type=int) or current_app.config.get('QR_REFRESH_SECONDS', 10)
+    refresh_min = current_app.config.get('QR_REFRESH_MIN', 5)
+    refresh_max = current_app.config.get('QR_REFRESH_MAX', 30)
+    refresh_seconds = max(refresh_min, min(refresh_seconds, refresh_max))
     allowed_ip = request.form.get('allowed_ip_prefix', '').strip() or current_app.config.get('ALLOWED_IP_PREFIX')
     latitude = request.form.get('latitude', type=float)
     longitude = request.form.get('longitude', type=float)

@@ -1,5 +1,6 @@
-from flask import Blueprint, render_template, session, redirect, url_for, request, flash
+from flask import Blueprint, render_template, session, redirect, url_for, request, flash, current_app
 from utils.decorators import role_required
+from utils.rate_limit import limiter
 from database import db
 from models.course import Course, CourseStudent
 from models.attendance_record import AttendanceRecord
@@ -39,6 +40,7 @@ def dashboard():
 
 @student_bp.route('/session/<session_id>/check-in', methods=['POST'])
 @role_required(2)
+@limiter.limit(lambda: current_app.config.get('RATE_LIMIT_ATTEND', '10/minute'))
 def check_in(session_id):
     user_id = session['user']['id']
     submitted_code = request.form.get('code', '')

@@ -1,5 +1,8 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash
+from datetime import datetime, timezone
+
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, current_app
 from services import auth_service
+from utils.rate_limit import limiter
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -12,6 +15,7 @@ def login_page():
 
 
 @auth_bp.route('/login', methods=['POST'])
+@limiter.limit(lambda: current_app.config.get('RATE_LIMIT_LOGIN', '5/minute'))
 def login():
     username = request.form.get('username', '').strip()
     password = request.form.get('password', '')
@@ -25,7 +29,9 @@ def login():
         flash(error, 'error')
         return redirect(url_for('auth.login_page'))
 
+    session.permanent = True
     session['user'] = user.to_dict()
+    session['last_activity_at'] = datetime.now(timezone.utc).isoformat()
 
     if user.role == 0:
         return redirect(url_for('admin.dashboard'))
@@ -36,6 +42,7 @@ def login():
 
 
 @auth_bp.route('/register', methods=['POST'])
+@limiter.limit(lambda: current_app.config.get('RATE_LIMIT_REGISTER', '5/minute'))
 def register():
     username = request.form.get('username', '').strip()
     email = request.form.get('email', '').strip()
