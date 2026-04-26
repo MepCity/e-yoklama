@@ -69,7 +69,7 @@
                 <td>{{ format_datetime(r.submitted_at) }}</td>
                 <td>{{ r.ip_address or '-' }}</td>
                 <td>{% if r.ip_match == 1 %}Evet{% elif r.ip_match == 0 %}Hayir{% else %}-{% endif %}</td>
-                <td>{% if r.gps_match == 1 %}Evet{% elif r.gps_match == 0 %}Hayir ({{ r.gps_distance_m|round(0) }}m){% else %}-{% endif %}</td>
+                <td>{% if r.gps_match == 1 %}Evet{% elif r.gps_match == 0 %}Hayir{% if r.gps_distance_m is not none %} ({{ r.gps_distance_m|round(0) }}m){% endif %}{% else %}-{% endif %}</td>
             </tr>
             {% endfor %}
         </tbody>
