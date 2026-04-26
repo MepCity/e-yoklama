@@ -22,12 +22,14 @@
 <div class="qr-section">
     <h2>Yoklama Kodu</h2>
     <div class="qr-code" id="currentCode">{{ att_session.current_code }}</div>
+    <p class="qr-hint">Gecerlilik: <span id="codeExpiresAt">{{ att_session.code_expires_at }}</span></p>
     {% if qr_base64 %}
     <div>
-        <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR Kod" style="max-width: 250px;">
+        <img id="qrImage" src="data:image/png;base64,{{ qr_base64 }}" alt="QR Kod" style="max-width: 250px;">
     </div>
     {% endif %}
     <p class="qr-hint">Kod her {{ att_session.code_refresh_seconds }} saniyede yenilenir. Ogrenciler bu kodu girerek yoklamaya katilabilir.</p>
+    <p class="qr-hint">Kalan sure: <span id="codeCountdown">-</span></p>
 </div>
 
 <div style="text-align: center; margin: 20px 0;">
@@ -78,4 +80,63 @@
 {% endif %}
 
 <a href="{{ url_for('teacher.course_schedule', course_id=att_session.course_id) }}" class="btn">Ders Programina Don</a>
+{% endblock %}
+
+{% block scripts %}
+{% if att_session.status == 'active' %}
+<script>
+(function () {
+    var sessionId = "{{ att_session.id }}";
+    var refreshSeconds = {{ att_session.code_refresh_seconds }};
+    var expiresAt = new Date("{{ att_session.code_expires_at }}");
+    var socket = io();
+
+    function updateCountdown() {
+        var remaining = Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / 1000));
+        var countdown = document.getElementById('codeCountdown');
+        if (countdown) {
+            countdown.textContent = remaining + ' sn';
+        }
+        if (remaining <= 0) {
+            socket.emit('refresh_attendance_code', { session_id: sessionId });
+        }
+    }
+
+    socket.on('connect', function () {
+        socket.emit('join_attendance_session', { session_id: sessionId });
+    });
+
+    socket.on('code_rotated', function (payload) {
+        if (!payload || payload.session_id !== sessionId) {
+            return;
+        }
+        document.getElementById('currentCode').textContent = payload.code;
+        document.getElementById('codeExpiresAt').textContent = payload.expires_at;
+        var qrImage = document.getElementById('qrImage');
+        if (qrImage && payload.qr_base64) {
+            qrImage.src = 'data:image/png;base64,' + payload.qr_base64;
+        }
+        expiresAt = new Date(payload.expires_at);
+        refreshSeconds = payload.refresh_seconds || refreshSeconds;
+        updateCountdown();
+    });
+
+    socket.on('attendance_error', function (payload) {
+        if (payload && payload.message) {
+            console.warn(payload.message);
+        }
+    });
+
+    window.addEventListener('beforeunload', function () {
+        socket.emit('leave_attendance_session', { session_id: sessionId });
+    });
+
+    updateCountdown();
+    setInterval(updateCountdown, 1000);
+    setInterval(function () {
+        socket.emit('refresh_attendance_code', { session_id: sessionId });
+    }, refreshSeconds * 1000);
+}());
+</script>
+{% endif %}
 {% endblock %}

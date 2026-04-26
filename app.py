@@ -2,7 +2,7 @@ from flask import Flask, redirect, url_for, session, render_template
 from flask_socketio import SocketIO
 from config import config
 
-socketio = SocketIO()
+socketio = SocketIO(manage_session=False)
 
 
 def create_app(config_name='development'):
@@ -15,6 +15,8 @@ def create_app(config_name='development'):
 
     # SocketIO
     socketio.init_app(app, cors_allowed_origins='*')
+    from sockets.attendance_socket import register_socket_events
+    register_socket_events(socketio)
 
     # Blueprint'ler
     from views.auth import auth_bp

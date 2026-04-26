@@ -501,7 +501,7 @@ Faz 1 tamamlandıktan sonra diğer AI'ın önerisiyle sıralama revize edildi:
 | Faz | İçerik | Durum |
 |-----|--------|-------|
 | **Faz 1** | Yoklama oturum başlat/bitir + minimal seed | **TAMAMLANDI** |
-| **Faz 2** | Dinamik QR kod + süreli kod doğrulama | Bekliyor |
+| **Faz 2** | Dinamik QR kod + süreli kod doğrulama | **TAMAMLANDI** |
 | **Faz 3** | Öğrenci yoklama akışı + duplicate check (FR-15) | Bekliyor |
 | **Faz 4** | IP/GPS doğrulama + "Yine de Devam Et" (FR-06, FR-07) | Bekliyor |
 | **Faz 5** | Şüpheli yoklama yönetimi — öğretmen onay/ret (FR-08, FR-09) | Bekliyor |
@@ -511,6 +511,57 @@ Faz 1 tamamlandıktan sonra diğer AI'ın önerisiyle sıralama revize edildi:
 | **Faz 9** | Responsive UI cilası + Türkçe lokalizasyon | Bekliyor |
 | **Faz 10** | Offline destek (FR-23) | Bekliyor |
 | **Faz 11** | Entegrasyon testi + final cleanup | Bekliyor |
+
+---
+
+### 11. Faz 2 — Dinamik QR Kod + WebSocket Canlı Yenileme (Tamamlandı)
+
+**Tarih:** 2026-04-26
+
+**Kapsam:** FR-04 — Yoklama oturumu boyunca periyodik yenilenen QR/alfanümerik kod.
+
+#### 11.1. Socket.IO Event Katmanı
+
+**Dosya:** `sockets/attendance_socket.py` — **YENİ**
+
+**Event'ler:**
+- `join_attendance_session` — Öğretmen aktif oturum odasına katılır. Sunucuda rol ve oturum sahipliği kontrol edilir.
+- `refresh_attendance_code` — Kod süresi dolduysa yeni kod üretilir ve `code_rotated` event'i aynı oturum odasına yayınlanır.
+- `leave_attendance_session` — Sayfadan çıkarken Socket.IO odasından ayrılır.
+
+Yetkisiz erişimde `attendance_error` event'i gönderilir. Öğretmen sadece kendi oturumuna erişebilir.
+
+#### 11.2. Attendance Service Güncellemeleri
+
+**Dosya:** `services/attendance_service.py`
+
+Eklenen fonksiyonlar:
+- `is_code_expired(session)` — `code_expires_at` alanını kontrol eder.
+- `refresh_code_if_expired(session_id)` — Kod süresi dolduysa yeniler, dolmadıysa mevcut kodu korur.
+- `get_code_payload(session)` — WebSocket payload'u için code/expires/refresh bilgilerini döner.
+
+`refresh_code(session_id)` Faz 1'deki gibi her çağrıda yeni kod üretir; WebSocket akışı ise çoklu istemcide gereksiz çift yenilemeyi önlemek için `refresh_code_if_expired()` kullanır.
+
+#### 11.3. App + Template Güncellemeleri
+
+**Dosyalar:**
+- `app.py` — Socket.IO `manage_session=False` ile Flask session uyumlu hale getirildi. `register_socket_events(socketio)` çağrısı eklendi.
+- `views/teacher.py` — Aktif oturum sayfası açılırken kod süresi dolmuşsa ilk render öncesi yenilenir.
+- `templates/teacher/active_session.html` — QR görseli, alfanümerik kod, geçerlilik zamanı ve kalan süre canlı güncellenir.
+
+Sayfa Socket.IO ile oturuma bağlanır, her saniye kalan süreyi gösterir ve süre dolduğunda sunucudan yenileme ister.
+
+#### 11.4. Testler
+
+**Geçen testler:**
+- `py_compile` başarılı.
+- Aktif oturum sayfası 200 döndü.
+- Template içinde `codeCountdown`, `join_attendance_session`, `qrImage` render edildi.
+- Socket.IO test client bağlandı.
+- `join_attendance_session` → `code_rotated` döndü.
+- Süresi geçmiş kod için `refresh_attendance_code` → yeni kod üretildi.
+- Yetkisiz öğretmen başka öğretmenin oturumuna katılınca `attendance_error` aldı.
+- Dev server smoke testi yapıldı. 5050 portu dolu olduğu için uygulama geçici olarak 5051 portunda başlatıldı; `HEAD /login` isteği 200 OK döndü.
 
 ---
 

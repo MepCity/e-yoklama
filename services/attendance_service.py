@@ -18,6 +18,15 @@ def _now_iso():
     return datetime.utcnow().isoformat()
 
 
+def _parse_iso(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
 def start_session(course_id, teacher_id, schedule_id=None,
                   refresh_seconds=10, allowed_ip_prefix=None,
                   latitude=None, longitude=None, radius_m=100):
@@ -90,6 +99,31 @@ def refresh_code(session_id):
     session.code_expires_at = (now + timedelta(seconds=session.code_refresh_seconds)).isoformat()
     db.commit()
     return session
+
+
+def is_code_expired(session):
+    expires_at = _parse_iso(session.code_expires_at)
+    return expires_at is None or datetime.utcnow() >= expires_at
+
+
+def refresh_code_if_expired(session_id):
+    session = db.query(AttendanceSession).filter_by(
+        id=session_id, status='active'
+    ).first()
+    if not session:
+        return None
+    if is_code_expired(session):
+        return refresh_code(session_id)
+    return session
+
+
+def get_code_payload(session):
+    return {
+        'session_id': session.id,
+        'code': session.current_code,
+        'expires_at': session.code_expires_at,
+        'refresh_seconds': session.code_refresh_seconds,
+    }
 
 
 def get_session_records(session_id):

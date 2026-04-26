@@ -99,6 +99,9 @@ def active_session(session_id):
         flash('Oturum bulunamadi.', 'error')
         return redirect(url_for('teacher.dashboard'))
 
+    if att_session.status == 'active' and attendance_service.is_code_expired(att_session):
+        att_session = attendance_service.refresh_code(att_session.id)
+
     records = attendance_service.get_session_records(session_id)
     enrolled_count = attendance_service.get_enrolled_count(att_session.course_id)
 
