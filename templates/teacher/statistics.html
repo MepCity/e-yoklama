@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block title %}Istatistiklerim — E-Yoklama{% endblock %}
+{% block content %}
+<h1>Ders Istatistikleri</h1>
+
+{% if course_stats %}
+<div class="stats-grid">
+    {% for cs in course_stats %}
+    <div class="stat-card">
+        <h3>{{ cs.course.name }}</h3>
+        <p class="stat-number">%{{ cs.rate }}</p>
+        <p>Katilim Orani</p>
+        <p>{{ cs.present }} katilim / {{ cs.total }} toplam</p>
+    </div>
+    {% endfor %}
+</div>
+
+<h2>Detayli Tablo</h2>
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>Ders</th>
+                <th>Toplam Kayit</th>
+                <th>Katilim</th>
+                <th>Devamsiz</th>
+                <th>Oran</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cs in course_stats %}
+            <tr>
+                <td>{{ cs.course.name }} ({{ cs.course.code or '-' }})</td>
+                <td>{{ cs.total }}</td>
+                <td>{{ cs.present }}</td>
+                <td>{{ cs.absent }}</td>
+                <td>%{{ cs.rate }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if course_stats|length > 0 %}
+<h2>Katilim Grafigi</h2>
+<div style="max-width: 600px; margin: 20px auto;">
+    <canvas id="attendanceChart"></canvas>
+</div>
+{% endif %}
+
+{% else %}
+<p>Henuz yoklama verisi bulunmuyor.</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if course_stats %}
+<script>
+const ctx = document.getElementById('attendanceChart').getContext('2d');
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: [{% for cs in course_stats %}'{{ cs.course.name }}'{% if not loop.last %},{% endif %}{% endfor %}],
+        datasets: [{
+            label: 'Katilim',
+            data: [{% for cs in course_stats %}{{ cs.present }}{% if not loop.last %},{% endif %}{% endfor %}],
+            backgroundColor: '#27ae60'
+        }, {
+            label: 'Devamsiz',
+            data: [{% for cs in course_stats %}{{ cs.absent }}{% if not loop.last %},{% endif %}{% endfor %}],
+            backgroundColor: '#e74c3c'
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true } }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block title %}{{ course.name }} — Ders Programi{% endblock %}
+{% block content %}
+<h1>{{ course.name }} <small>({{ course.code or '' }})</small></h1>
+
+<div class="card">
+    <h3>Yeni Ders Saati Ekle</h3>
+    <form method="POST">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Gun *</label>
+                <select name="day_of_week" required>
+                    <option value="">Seciniz</option>
+                    <option value="0">Pazartesi</option>
+                    <option value="1">Sali</option>
+                    <option value="2">Carsamba</option>
+                    <option value="3">Persembe</option>
+                    <option value="4">Cuma</option>
+                    <option value="5">Cumartesi</option>
+                    <option value="6">Pazar</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Baslangic *</label>
+                <input type="time" name="start_time" required>
+            </div>
+            <div class="form-group">
+                <label>Bitis *</label>
+                <input type="time" name="end_time" required>
+            </div>
+            <div class="form-group">
+                <label>Derslik</label>
+                <input type="text" name="room" placeholder="A-301">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Ekle</button>
+    </form>
+</div>
+
+<h2>Mevcut Program</h2>
+{% if schedules %}
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>Gun</th>
+                <th>Baslangic</th>
+                <th>Bitis</th>
+                <th>Derslik</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in schedules %}
+            <tr>
+                <td>{{ day_name(s.day_of_week) }}</td>
+                <td>{{ s.start_time }}</td>
+                <td>{{ s.end_time }}</td>
+                <td>{{ s.room or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p>Henuz ders saati eklenmemis.</p>
+{% endif %}
+
+<a href="{{ url_for('teacher.dashboard') }}" class="btn">Geri Don</a>
+{% endblock %}

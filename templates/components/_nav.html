@@ -1,0 +1,29 @@
+<nav class="navbar">
+    <div class="nav-brand">
+        <a href="/">E-Yoklama</a>
+        <button class="nav-toggle" onclick="toggleNav()">&#9776;</button>
+    </div>
+    <div class="nav-links" id="navLinks">
+        {% set user = session.get('user', {}) %}
+        {% set role = user.get('role', -1) %}
+
+        {% if role == 0 %}
+            <a href="{{ url_for('admin.dashboard') }}" class="nav-link">Panel</a>
+            <a href="{{ url_for('admin.students') }}" class="nav-link">Ogrenciler</a>
+            <a href="{{ url_for('admin.teachers') }}" class="nav-link">Ogretmenler</a>
+            <a href="{{ url_for('admin.courses') }}" class="nav-link">Dersler</a>
+            <a href="{{ url_for('admin.statistics') }}" class="nav-link">Istatistikler</a>
+        {% elif role == 1 %}
+            <a href="{{ url_for('teacher.dashboard') }}" class="nav-link">Panel</a>
+            <a href="{{ url_for('teacher.statistics') }}" class="nav-link">Istatistikler</a>
+        {% elif role == 2 %}
+            <a href="{{ url_for('student.dashboard') }}" class="nav-link">Panel</a>
+            <a href="{{ url_for('student.statistics') }}" class="nav-link">Istatistikler</a>
+        {% endif %}
+
+        <div class="nav-user">
+            <span class="nav-username">{{ user.get('username', '') }}</span>
+            <a href="{{ url_for('auth.logout') }}" class="nav-link nav-logout">Cikis Yap</a>
+        </div>
+    </div>
+</nav>

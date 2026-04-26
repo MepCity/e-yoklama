@@ -1,136 +1,160 @@
 from flask import Blueprint, render_template, session, redirect, url_for, request, flash
-from models.users import Users
-from models.lessons import Courses, CourseStudents, Lessons, Attendance
-from databases import db
+from utils.decorators import role_required
+from database import db
+from models.user import User
+from models.course import Course, CourseStudent
+from models.schedule import Schedule
+from models.attendance_record import AttendanceRecord
+from services import auth_service
 from sqlalchemy import func
 
 admin_bp = Blueprint('admin', __name__)
 
-@admin_bp.route('/dashboard')
-def dashboard():
-    if 'user' not in session or session['user']['role'] != 0:
-        return redirect(url_for('auth.login_page'))
-    return render_template('admin.html')
 
-# Öğrenci yönetimi
+@admin_bp.route('/dashboard')
+@role_required(0)
+def dashboard():
+    return render_template('admin/dashboard.html')
+
+
 @admin_bp.route('/students')
+@role_required(0)
 def students():
-    if 'user' not in session or session['user']['role'] != 0:
-        return redirect(url_for('auth.login_page'))
-    
-    # Filtreleme ve sıralama
     sort_by = request.args.get('sort', 'student_number')
     department = request.args.get('department', '')
-    
-    students = db.query(Users).filter(Users.role == 2)
-    
+
+    query = db.query(User).filter(User.role == 2)
+
     if department:
-        students = students.filter(Users.department == department)
-    
-    if sort_by == 'student_number':
-        students = students.order_by(Users.student_number)
-    elif sort_by == 'department':
-        students = students.order_by(Users.department)
+        query = query.filter(User.department == department)
+
+    if sort_by == 'department':
+        query = query.order_by(User.department)
     elif sort_by == 'class_name':
-        students = students.order_by(Users.class_name)
-    
-    students = students.all()
-    
-    # Bölümleri al
-    departments = db.query(Users.department).filter(Users.role == 2, Users.department != None).distinct().all()
+        query = query.order_by(User.class_name)
+    else:
+        query = query.order_by(User.student_number)
+
+    student_list = query.all()
+
+    departments = db.query(User.department).filter(
+        User.role == 2, User.department.isnot(None)
+    ).distinct().all()
     departments = [d[0] for d in departments if d[0]]
-    
-    return render_template('admin_students.html', students=students, departments=departments)
 
-# Öğretmen yönetimi
+    return render_template('admin/students.html', students=student_list, departments=departments)
+
+
 @admin_bp.route('/teachers')
+@role_required(0)
 def teachers():
-    if 'user' not in session or session['user']['role'] != 0:
-        return redirect(url_for('auth.login_page'))
-    
-    teachers = Users.query.filter(Users.role == 1).all()
-    return render_template('admin_teachers.html', teachers=teachers)
+    teacher_list = db.query(User).filter(User.role == 1).all()
+    return render_template('admin/teachers.html', teachers=teacher_list)
 
-# Öğretmen ekle
+
 @admin_bp.route('/add_teacher', methods=['POST'])
+@role_required(0)
 def add_teacher():
-    if 'user' not in session or session['user']['role'] != 0:
-        return redirect(url_for('auth.login_page'))
-    
-    username = request.form['username']
-    email = request.form['email']
-    password = request.form['password']
-    branch = request.form.get('branch', '')
-    
-    Users.register(username, email, password, role=1, branch=branch)
-    flash('Öğretmen başarıyla eklendi!', 'success')
+    username = request.form.get('username', '').strip()
+    email = request.form.get('email', '').strip()
+    password = request.form.get('password', '')
+    branch = request.form.get('branch', '').strip()
+
+    if not username or not email or not password:
+        flash('Tum zorunlu alanlar doldurulmalidir.', 'error')
+        return redirect(url_for('admin.teachers'))
+
+    user, error = auth_service.register_teacher(username, email, password, branch=branch or None)
+    if error:
+        flash(error, 'error')
+    else:
+        flash('Ogretmen basariyla eklendi.', 'success')
     return redirect(url_for('admin.teachers'))
 
-# Ders yönetimi
+
 @admin_bp.route('/courses')
+@role_required(0)
 def courses():
-    if 'user' not in session or session['user']['role'] != 0:
-        return redirect(url_for('auth.login_page'))
-    
-    all_courses = Courses.get_all()
-    teachers = Users.query.filter(Users.role == 1).all()
-    return render_template('admin_courses.html', courses=all_courses, teachers=teachers)
+    course_list = db.query(Course).all()
+    teacher_list = db.query(User).filter(User.role == 1).all()
+    student_list = db.query(User).filter(User.role == 2).all()
+    return render_template('admin/courses.html', courses=course_list, teachers=teacher_list, students=student_list)
 
-# Ders oluştur
+
 @admin_bp.route('/create_course', methods=['POST'])
+@role_required(0)
 def create_course():
-    if 'user' not in session or session['user']['role'] != 0:
-        return redirect(url_for('auth.login_page'))
-    
-    name = request.form['name']
-    description = request.form.get('description', '')
-    teacher_id = int(request.form['teacher_id'])
-    department = request.form.get('department', '')
-    class_name = request.form.get('class_name', '')
-    
-    Courses.create(name, description, teacher_id, department, class_name)
-    flash('Ders başarıyla oluşturuldu!', 'success')
+    name = request.form.get('name', '').strip()
+    code = request.form.get('code', '').strip()
+    description = request.form.get('description', '').strip()
+    teacher_id = request.form.get('teacher_id', type=int)
+    department = request.form.get('department', '').strip()
+    class_name = request.form.get('class_name', '').strip()
+
+    if not name or not teacher_id:
+        flash('Ders adi ve ogretmen secimi zorunludur.', 'error')
+        return redirect(url_for('admin.courses'))
+
+    course = Course(
+        name=name,
+        code=code or None,
+        description=description or None,
+        teacher_id=teacher_id,
+        department=department or None,
+        class_name=class_name or None,
+    )
+    db.add(course)
+    db.commit()
+    flash('Ders basariyla olusturuldu.', 'success')
     return redirect(url_for('admin.courses'))
 
-# Derse öğrenci ekle
+
 @admin_bp.route('/add_student_to_course', methods=['POST'])
+@role_required(0)
 def add_student_to_course():
-    if 'user' not in session or session['user']['role'] != 0:
-        return redirect(url_for('auth.login_page'))
-    
-    course_id = int(request.form['course_id'])
-    student_id = int(request.form['student_id'])
-    
-    Courses.add_student(course_id, student_id)
-    flash('Öğrenci derse eklendi!', 'success')
+    course_id = request.form.get('course_id', type=int)
+    student_id = request.form.get('student_id', type=int)
+
+    if not course_id or not student_id:
+        flash('Ders ve ogrenci secimi zorunludur.', 'error')
+        return redirect(url_for('admin.courses'))
+
+    existing = db.query(CourseStudent).filter_by(course_id=course_id, student_id=student_id).first()
+    if existing:
+        flash('Bu ogrenci zaten bu derse kayitli.', 'error')
+        return redirect(url_for('admin.courses'))
+
+    cs = CourseStudent(course_id=course_id, student_id=student_id)
+    db.add(cs)
+    db.commit()
+    flash('Ogrenci derse eklendi.', 'success')
     return redirect(url_for('admin.courses'))
 
-# İstatistikler
+
 @admin_bp.route('/statistics')
+@role_required(0)
 def statistics():
-    if 'user' not in session or session['user']['role'] != 0:
-        return redirect(url_for('auth.login_page'))
-    
-    # Öğrenci istatistikleri
-    total_students = Users.query.filter(Users.role == 2).count()
-    total_teachers = Users.query.filter(Users.role == 1).count()
-    total_courses = Courses.query.count()
-    
-    # Yoklama istatistikleri
-    total_attendances = Attendance.query.count()
-    present_count = Attendance.query.filter(Attendance.status == 1).count()
-    absent_count = Attendance.query.filter(Attendance.status == 0).count()
-    
-    # Bölüm bazlı öğrenci sayıları
-    dept_stats = db.query(Users.department, func.count(Users.id)).filter(
-        Users.role == 2, Users.department != None
-    ).group_by(Users.department).all()
-    
-    return render_template('admin_statistics.html', 
-                         total_students=total_students,
-                         total_teachers=total_teachers,
-                         total_courses=total_courses,
-                         total_attendances=total_attendances,
-                         present_count=present_count,
-                         absent_count=absent_count,
-                         dept_stats=dept_stats)
+    total_students = db.query(User).filter(User.role == 2).count()
+    total_teachers = db.query(User).filter(User.role == 1).count()
+    total_courses = db.query(Course).count()
+    total_records = db.query(AttendanceRecord).count()
+
+    verified_count = db.query(AttendanceRecord).filter(
+        AttendanceRecord.status.in_(['verified', 'approved', 'manual'])
+    ).count()
+    absent_count = db.query(AttendanceRecord).filter(
+        AttendanceRecord.status == 'rejected'
+    ).count()
+
+    dept_stats = db.query(User.department, func.count(User.id)).filter(
+        User.role == 2, User.department.isnot(None)
+    ).group_by(User.department).all()
+
+    return render_template('admin/statistics.html',
+                           total_students=total_students,
+                           total_teachers=total_teachers,
+                           total_courses=total_courses,
+                           total_records=total_records,
+                           verified_count=verified_count,
+                           absent_count=absent_count,
+                           dept_stats=dept_stats)

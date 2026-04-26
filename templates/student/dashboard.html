@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block title %}Ogrenci Paneli — E-Yoklama{% endblock %}
+{% block content %}
+<h1>Derslerim</h1>
+
+{% if courses %}
+<div class="card-grid">
+    {% for c in courses %}
+    <div class="card">
+        <h3>{{ c.name }}</h3>
+        <p>{{ c.code or '' }} — {{ c.department or '' }}</p>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p>Henuz kayitli dersiniz bulunmuyor.</p>
+{% endif %}
+{% endblock %}

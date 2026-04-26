@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}Admin Panel — E-Yoklama{% endblock %}
+{% block content %}
+<h1>Admin Paneli</h1>
+<div class="card-grid">
+    <a href="{{ url_for('admin.students') }}" class="card">
+        <h3>Ogrenciler</h3>
+        <p>Ogrenci listesi ve yonetimi</p>
+    </a>
+    <a href="{{ url_for('admin.teachers') }}" class="card">
+        <h3>Ogretmenler</h3>
+        <p>Ogretmen listesi ve ekleme</p>
+    </a>
+    <a href="{{ url_for('admin.courses') }}" class="card">
+        <h3>Dersler</h3>
+        <p>Ders olusturma ve ogrenci atama</p>
+    </a>
+    <a href="{{ url_for('admin.statistics') }}" class="card">
+        <h3>Istatistikler</h3>
+        <p>Genel sistem istatistikleri</p>
+    </a>
+</div>
+{% endblock %}

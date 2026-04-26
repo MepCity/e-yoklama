@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block title %}Ogrenciler — E-Yoklama{% endblock %}
+{% block content %}
+<h1>Ogrenci Yonetimi</h1>
+
+<div class="filter-bar">
+    <form method="GET" class="filter-form">
+        <select name="department" onchange="this.form.submit()">
+            <option value="">Tum Bolumler</option>
+            {% for dept in departments %}
+            <option value="{{ dept }}" {% if request.args.get('department') == dept %}selected{% endif %}>{{ dept }}</option>
+            {% endfor %}
+        </select>
+        <select name="sort" onchange="this.form.submit()">
+            <option value="student_number" {% if request.args.get('sort') == 'student_number' %}selected{% endif %}>Ogrenci No</option>
+            <option value="department" {% if request.args.get('sort') == 'department' %}selected{% endif %}>Bolum</option>
+            <option value="class_name" {% if request.args.get('sort') == 'class_name' %}selected{% endif %}>Sinif</option>
+        </select>
+    </form>
+</div>
+
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>Ogrenci No</th>
+                <th>Kullanici Adi</th>
+                <th>E-posta</th>
+                <th>Bolum</th>
+                <th>Sinif</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in students %}
+            <tr>
+                <td>{{ s.student_number or '-' }}</td>
+                <td>{{ s.username }}</td>
+                <td>{{ s.email }}</td>
+                <td>{{ s.department or '-' }}</td>
+                <td>{{ s.class_name or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block title %}Dersler — E-Yoklama{% endblock %}
+{% block content %}
+<h1>Ders Yonetimi</h1>
+
+<div class="card">
+    <h3>Yeni Ders Olustur</h3>
+    <form method="POST" action="{{ url_for('admin.create_course') }}">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Ders Adi *</label>
+                <input type="text" name="name" required placeholder="Yazilim Muhendisligi">
+            </div>
+            <div class="form-group">
+                <label>Ders Kodu</label>
+                <input type="text" name="code" placeholder="YZM301">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Aciklama</label>
+            <input type="text" name="description" placeholder="Ders aciklamasi">
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Ogretmen *</label>
+                <select name="teacher_id" required>
+                    <option value="">Seciniz</option>
+                    {% for t in teachers %}
+                    <option value="{{ t.id }}">{{ t.username }} ({{ t.branch or '-' }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Bolum</label>
+                <input type="text" name="department" placeholder="Bilgisayar Muhendisligi">
+            </div>
+            <div class="form-group">
+                <label>Sinif</label>
+                <input type="text" name="class_name" placeholder="3. Sinif">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Ders Olustur</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>Derse Ogrenci Ekle</h3>
+    <form method="POST" action="{{ url_for('admin.add_student_to_course') }}" class="form-inline">
+        <div class="form-group">
+            <select name="course_id" required>
+                <option value="">Ders Seciniz</option>
+                {% for c in courses %}
+                <option value="{{ c.id }}">{{ c.name }} ({{ c.code or '-' }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <select name="student_id" required>
+                <option value="">Ogrenci Seciniz</option>
+                {% for s in students %}
+                <option value="{{ s.id }}">{{ s.student_number }} — {{ s.username }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Ekle</button>
+    </form>
+</div>
+
+<h2>Mevcut Dersler</h2>
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>Kod</th>
+                <th>Ders Adi</th>
+                <th>Ogretmen</th>
+                <th>Bolum</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in courses %}
+            <tr>
+                <td>{{ c.code or '-' }}</td>
+                <td>{{ c.name }}</td>
+                <td>{{ c.teacher.username if c.teacher else '-' }}</td>
+                <td>{{ c.department or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

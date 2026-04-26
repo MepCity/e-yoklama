@@ -298,6 +298,99 @@ attendance_records (1) ──< (N) verification_logs [record_id]
 
 **Test:** 7 tablo sorunsuz oluştu: `users`, `courses`, `course_students`, `schedules`, `attendance_sessions`, `attendance_records`, `verification_logs`. Nesne oluşturma, relationship erişimi ve duplicate constraint kontrolü başarılı.
 
+### 8. Adım 5 — App Factory + Base Template + View'lar (Tamamlandı)
+
+**Tarih:** 2026-04-26
+
+**Oluşturulan/değiştirilen dosyalar:**
+
+- `app.py` — **Yeniden yazıldı.** Application Factory pattern (`create_app(config_name)`). Blueprint register, init_db, SocketIO init, error handler'lar, jinja globals (day_name, format_datetime, STATUS_LABELS, STATUS_COLORS). Eski monolitik `if __name__` bloğu kaldırıldı.
+- `wsgi.py` — **YENİ.** Giriş noktası: `from app import create_app, socketio; app = create_app(); socketio.run(app)`
+- `templates/base.html` — **YENİ.** Ana layout: viewport meta, CSS link, Chart.js CDN, Socket.IO CDN, nav include, flash include, content/scripts blokları
+- `templates/components/_nav.html` — **YENİ.** Rol bazlı navigasyon (admin/öğretmen/öğrenci linkleri), mobil hamburger menü toggle
+- `templates/components/_flash.html` — **YENİ.** Flash mesajları: success/error/info/warning tipleri, kapatma butonu
+- `templates/errors/404.html` — **YENİ.** 404/403 hata sayfası
+- `static/js/app.js` — **Yeniden yazıldı.** `toggleNav()` mobil menü, flash mesajları 5sn sonra otomatik kapanma
+
+**View'lar (Sunum Katmanı):**
+
+- `views/admin.py` — **Yeniden yazıldı.** `@role_required(0)` decorator ile korunan admin route'ları: dashboard, students (filtreleme/sıralama), teachers, add_teacher, courses, create_course, add_student_to_course, statistics
+- `views/teacher.py` — **Yeniden yazıldı.** `@role_required(1)` ile: dashboard (öğretmenin dersleri), course_schedule (GET/POST — ders saati ekleme), statistics (ders bazlı katılım istatistikleri)
+- `views/student.py` — **Yeniden yazıldı.** `@role_required(2)` ile: dashboard (kayıtlı dersler), statistics (genel + ders bazlı katılım oranı)
+
+**Admin Template'leri:**
+- `templates/admin/dashboard.html` — Hızlı erişim linkleri (Öğrenciler, Öğretmenler, Dersler, İstatistikler)
+- `templates/admin/students.html` — Öğrenci listesi: bölüm filtresi, sıralama (öğrenci no/bölüm/sınıf)
+- `templates/admin/teachers.html` — Öğretmen listesi + yeni öğretmen ekleme formu
+- `templates/admin/courses.html` — Ders listesi + yeni ders oluşturma + derse öğrenci ekleme
+- `templates/admin/statistics.html` — İstatistik kartları (toplam öğrenci/öğretmen/ders/kayıt) + bölüm bazlı dağılım tablosu
+
+**Test:** Tüm route'lar Flask route map'de doğrulandı.
+
+### 9. Adım 6 — Auth Sistemi + Kalan Template'ler + CSS (Tamamlandı)
+
+**Tarih:** 2026-04-26
+
+**Auth Sistemi:**
+
+- `services/auth_service.py` — **YENİ.** İş mantığı katmanı:
+  - `login(username, password)` → user veya hata mesajı döner
+  - `register_student(username, email, password, student_number, ...)` → user veya hata
+  - `register_teacher(username, email, password, branch)` → user veya hata
+  - `get_user_by_id(user_id)` → user nesnesi
+- `views/auth.py` — **Yeniden yazıldı.** GET/POST `/login`, POST `/register`, GET `/logout`. Doğrudan model erişimi yerine auth_service kullanır
+- `templates/auth/login.html` — **YENİ.** Tab arayüzü: Giriş / Kayıt Ol sekmeleri. Giriş: kullanıcı adı + şifre. Kayıt: ad, e-posta, şifre, öğrenci no, bölüm, sınıf
+
+**Kalan Template'ler:**
+
+- `templates/teacher/dashboard.html` — Öğretmenin dersleri (kart grid) + ders programı linki
+- `templates/teacher/schedule.html` — **YENİ.** Ders saati ekleme formu (gün, başlangıç, bitiş, derslik) + mevcut program tablosu
+- `templates/teacher/statistics.html` — **YENİ.** Ders bazlı katılım oranı kartları + detaylı tablo + Chart.js bar grafik
+- `templates/student/dashboard.html` — **YENİ.** Öğrencinin kayıtlı dersleri (kart grid)
+- `templates/student/statistics.html` — **YENİ.** Genel istatistik kartları (toplam/katılım/devamsız/oran) + ders bazlı tablo + Chart.js doughnut grafik
+
+**CSS:**
+
+- `static/css/style.css` — **Tamamen yeniden yazıldı.** Responsive tasarım:
+  - Modern reset + system font stack
+  - Navigasyon: flex layout, mobil hamburger menü (768px altı)
+  - Flash mesajlar: sol border renk kodlu (success/error/info/warning)
+  - Butonlar: btn, btn-primary, btn-danger, btn-small
+  - Kart sistemi: card, card-grid (auto-fill grid), card-actions
+  - İstatistik kartları: stats-grid, stat-card, stat-number
+  - Form sistemi: form-group, form-row (grid), form-inline (flex)
+  - Tablo: table-responsive (overflow scroll), hover efekti
+  - Tab sistemi: tablink, tabcontent
+  - Durum renkleri: status-verified, status-suspicious, status-absent vb.
+  - QR bölümü: qr-section, qr-code
+  - 3 breakpoint: 768px, 480px
+
+**Test:** `python3 -c "from app import create_app; app = create_app()"` başarılı. 18 route doğrulandı:
+- `/`, `/login`, `/register`, `/logout`
+- `/admin/dashboard`, `/admin/students`, `/admin/teachers`, `/admin/add_teacher`, `/admin/courses`, `/admin/create_course`, `/admin/add_student_to_course`, `/admin/statistics`
+- `/teacher/dashboard`, `/teacher/course/<int:course_id>/schedule`, `/teacher/statistics`
+- `/student/dashboard`, `/student/statistics`
+- `/static/<path:filename>`
+
+---
+
+### Faz 0 Durumu
+
+Adım 1-6 tamamlandı. Faz 0 (Altyapı) büyük ölçüde tamamlanmış durumda:
+
+- [x] config.py — Merkezi yapılandırma
+- [x] requirements.txt — Bağımlılıklar
+- [x] database/ — Scoped session, init_db, teardown
+- [x] models/ — 7 model (User, Course, CourseStudent, Schedule, AttendanceSession, AttendanceRecord, VerificationLog)
+- [x] utils/ — Hashing, decorators, helpers, QR generator
+- [x] app.py — Application factory + SocketIO
+- [x] wsgi.py — Giriş noktası
+- [x] templates/ — Base layout + admin (5) + teacher (3) + student (2) + auth (1) + error (1) + components (2)
+- [x] CSS — Responsive tasarım
+- [x] Auth sistemi — Service + view + template
+
+**Sonraki hedef:** Faz 1 — Yoklama oturum yaşam döngüsü (start/end), attendance_service.py
+
 ---
 
 *Sonraki adımlar bu dosyaya eklenecektir.*

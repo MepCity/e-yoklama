@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}Istatistikler — E-Yoklama{% endblock %}
+{% block content %}
+<h1>Sistem Istatistikleri</h1>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>{{ total_students }}</h3>
+        <p>Toplam Ogrenci</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ total_teachers }}</h3>
+        <p>Toplam Ogretmen</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ total_courses }}</h3>
+        <p>Toplam Ders</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ total_records }}</h3>
+        <p>Toplam Yoklama Kaydi</p>
+    </div>
+</div>
+
+{% if dept_stats %}
+<h2>Bolum Bazli Ogrenci Dagilimi</h2>
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr><th>Bolum</th><th>Ogrenci Sayisi</th></tr>
+        </thead>
+        <tbody>
+            {% for dept, count in dept_stats %}
+            <tr><td>{{ dept }}</td><td>{{ count }}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}Ogretmen Paneli — E-Yoklama{% endblock %}
+{% block content %}
+<h1>Derslerim</h1>
+
+{% if courses %}
+<div class="card-grid">
+    {% for c in courses %}
+    <div class="card">
+        <h3>{{ c.name }}</h3>
+        <p>{{ c.code or '' }} — {{ c.department or '' }}</p>
+        <div class="card-actions">
+            <a href="{{ url_for('teacher.course_schedule', course_id=c.id) }}" class="btn btn-small">Ders Programi</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p>Henuz atanmis dersiniz bulunmuyor.</p>
+{% endif %}
+{% endblock %}
