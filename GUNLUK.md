@@ -605,4 +605,28 @@ Eklenen fonksiyonlar:
 
 ---
 
+### 13. Legacy Temizlik (Tamamlandı)
+
+**Tarih:** 2026-04-26
+
+Yeni modüler monolit yapısına geçildikten sonra kullanılmayan eski dosyalar kaldırıldı:
+
+- `controllers/` — eski controller/stub dosyaları
+- `databases/` — eski global session veritabanı katmanı
+- `models/auth.py`, `models/lessons.py`, `models/users.py` — eski model dosyaları
+- Eski root template dosyaları (`templates/admin.html`, `templates/student.html`, `templates/teacher.html`, vb.)
+- `static/js/script.js` — eski login tab script'i
+- Uygulama tarafından kullanılmayan büyük teslim dokümanları (`.docx`, `.pdf`) repo dışına alındı
+- `__pycache__` klasörleri ve lokal `e_yoklama.db`
+
+**Doğrulama:**
+- Eski `databases`, `controllers`, `models.users`, `models.lessons`, `models.auth` import referansı kalmadı.
+- `database/` aktif veritabanı katmanı olarak kaldı; eski `databases/` tamamen kaldırıldı.
+- `py_compile` başarılı.
+- `create_app('testing')` başarılı.
+- `/login` 200, 404 sayfası 404 döndü.
+- Öğrenci check-in smoke testi başarılı.
+
+---
+
 *Sonraki adımlar bu dosyaya eklenecektir.*
