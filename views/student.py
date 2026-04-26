@@ -42,18 +42,29 @@ def dashboard():
 def check_in(session_id):
     user_id = session['user']['id']
     submitted_code = request.form.get('code', '')
+    override = request.form.get('override') == '1'
+    override_reason = request.form.get('override_reason', '').strip() or None
+    latitude = request.form.get('latitude', type=float)
+    longitude = request.form.get('longitude', type=float)
 
     record, error = attendance_service.check_in(
         session_id=session_id,
         student_id=user_id,
         submitted_code=submitted_code,
         ip_address=request.remote_addr,
+        latitude=latitude,
+        longitude=longitude,
+        override=override,
+        override_reason=override_reason,
     )
     if error:
         flash(error, 'error')
         return redirect(url_for('student.dashboard'))
 
-    flash('Yoklama kaydiniz dogrulandi.', 'success')
+    if record.status == 'suspicious':
+        flash('Yoklama kaydiniz supheli olarak ogretmen onayina gonderildi.', 'warning')
+    else:
+        flash('Yoklama kaydiniz dogrulandi.', 'success')
     return redirect(url_for('student.statistics'))
 
 

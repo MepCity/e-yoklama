@@ -17,13 +17,21 @@
             {% else %}
             <form method="POST" action="{{ url_for('student.check_in', session_id=active.id) }}" class="check-in-form">
                 <label for="code-{{ active.id }}">Yoklama Kodu</label>
+                <input type="hidden" name="latitude" class="gps-latitude">
+                <input type="hidden" name="longitude" class="gps-longitude">
                 <div class="form-inline">
                     <div class="form-group">
                         <input id="code-{{ active.id }}" type="text" name="code" required maxlength="20" placeholder="Kodu girin">
                     </div>
                     <button type="submit" class="btn btn-primary">Yoklama Ver</button>
                 </div>
+                <label class="checkbox-label">
+                    <input type="checkbox" name="override" value="1">
+                    Dogrulama basarisiz olursa Yine de Devam Et
+                </label>
+                <input type="text" name="override_reason" placeholder="Aciklama (opsiyonel)">
                 <p class="qr-hint">Kod gecerlilik zamani: {{ active.code_expires_at }}</p>
+                <p class="qr-hint gps-status">Konum bilgisi bekleniyor.</p>
             </form>
             {% endif %}
         </div>
@@ -34,4 +42,46 @@
 {% else %}
 <p>Henuz kayitli dersiniz bulunmuyor.</p>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var forms = document.querySelectorAll('.check-in-form');
+    if (!forms.length) {
+        return;
+    }
+    if (!navigator.geolocation) {
+        forms.forEach(function (form) {
+            var status = form.querySelector('.gps-status');
+            if (status) {
+                status.textContent = 'Tarayiciniz konum bilgisini desteklemiyor.';
+            }
+        });
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(function (position) {
+        forms.forEach(function (form) {
+            form.querySelector('.gps-latitude').value = position.coords.latitude;
+            form.querySelector('.gps-longitude').value = position.coords.longitude;
+            var status = form.querySelector('.gps-status');
+            if (status) {
+                status.textContent = 'Konum bilgisi alindi.';
+            }
+        });
+    }, function () {
+        forms.forEach(function (form) {
+            var status = form.querySelector('.gps-status');
+            if (status) {
+                status.textContent = 'Konum izni verilmedi. Gerekirse yine de devam secenegini kullanin.';
+            }
+        });
+    }, {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 30000
+    });
+});
+</script>
 {% endblock %}

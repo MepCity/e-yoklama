@@ -503,7 +503,7 @@ Faz 1 tamamlandıktan sonra diğer AI'ın önerisiyle sıralama revize edildi:
 | **Faz 1** | Yoklama oturum başlat/bitir + minimal seed | **TAMAMLANDI** |
 | **Faz 2** | Dinamik QR kod + süreli kod doğrulama | **TAMAMLANDI** |
 | **Faz 3** | Öğrenci yoklama akışı + duplicate check (FR-15) | **TAMAMLANDI** |
-| **Faz 4** | IP/GPS doğrulama + "Yine de Devam Et" (FR-06, FR-07) | Bekliyor |
+| **Faz 4** | IP/GPS doğrulama + "Yine de Devam Et" (FR-06, FR-07) | **TAMAMLANDI** |
 | **Faz 5** | Şüpheli yoklama yönetimi — öğretmen onay/ret (FR-08, FR-09) | Bekliyor |
 | **Faz 6** | İstatistikleri gerçek veriye dayandır + Chart.js (FR-14) | Bekliyor |
 | **Faz 7** | Excel export (FR-11) | Bekliyor |
@@ -626,6 +626,64 @@ Yeni modüler monolit yapısına geçildikten sonra kullanılmayan eski dosyalar
 - `create_app('testing')` başarılı.
 - `/login` 200, 404 sayfası 404 döndü.
 - Öğrenci check-in smoke testi başarılı.
+
+---
+
+### 14. Faz 4 — IP/GPS Doğrulama + Yine de Devam Et (Tamamlandı)
+
+**Tarih:** 2026-04-26
+
+**Kapsam:** FR-06, FR-07 — Öğrenci yoklama geçişinde IP/GPS doğrulama ve doğrulama başarısızsa öğrencinin "Yine de Devam Et" ile şüpheli kayıt oluşturabilmesi.
+
+#### 14.1. Verification Service
+
+**Dosya:** `services/verification_service.py` — **YENİ**
+
+Eklenen kontroller:
+- `validate_ip(ip_address, allowed_prefix)` — IP prefix doğrulaması.
+- `validate_gps(latitude, longitude, target_latitude, target_longitude, radius_m)` — kampüs/sınıf yarıçapı kontrolü.
+- `haversine_m(...)` — iki GPS noktası arasındaki mesafeyi metre cinsinden hesaplar.
+- `validate_context(...)` — IP + GPS sonuçlarını tek structured sonuçta toplar.
+
+Not: Lokal geliştirme/test için `127.0.0.1` ve `::1` IP adresleri bypass edilir.
+
+#### 14.2. Attendance Service Güncellemeleri
+
+**Dosya:** `services/attendance_service.py`
+
+- `check_in()` artık IP/GPS doğrulama sonucunu kullanır.
+- Doğrulama başarılıysa kayıt `status='verified'` olur.
+- Doğrulama başarısız ve override yoksa işlem reddedilir.
+- Doğrulama başarısız ve override varsa kayıt `status='suspicious'`, `override_used=1` olur.
+- IP/GPS eşleşme bilgileri `AttendanceRecord` alanlarına yazılır.
+- Kod/IP/GPS/override sonuçları `VerificationLog` tablosuna yazılır.
+- Öğretmen ders programı seçerse `Schedule.latitude/longitude/radius_m` değerleri oturuma kopyalanır.
+
+#### 14.3. Student View + Template Güncellemeleri
+
+**Dosyalar:**
+- `views/student.py` — check-in formundan `latitude`, `longitude`, `override`, `override_reason` alınır.
+- `templates/student/dashboard.html` — GPS hidden input'ları, konum alma JavaScript'i, "Yine de Devam Et" seçeneği ve opsiyonel açıklama alanı eklendi.
+
+#### 14.4. Testler
+
+**Geçen testler:**
+- `py_compile` başarılı.
+- Doğru IP + doğru GPS → `verified`.
+- Hatalı IP + override yok → işlem reddedildi.
+- Hatalı IP + override var → `suspicious`.
+- Hatalı GPS + override var → `suspicious`.
+- Duplicate check hâlâ çalışıyor.
+- HTTP öğrenci dashboard GPS alanlarını render ediyor.
+- HTTP override check-in sonrası `AttendanceRecord(status='suspicious')` oluştu.
+
+#### 14.5. Bug Fix — gps_distance_m None Kontrolü
+
+**Dosya:** `templates/teacher/active_session.html:72`
+
+**Sorun:** GPS koordinatları gönderilmediğinde `gps_match=0` ama `gps_distance_m=None` oluyordu. Template'teki `{{ r.gps_distance_m|round(0) }}` ifadesi None üzerinde `round()` çağırınca `TypeError: type NoneType doesn't define __round__ method` hatası veriyordu. Bu hata öğretmenin aktif oturum sayfasını tamamen kırıyordu (500 hatası).
+
+**Düzeltme:** `{% if r.gps_distance_m is not none %}` kontrolü eklendi. Mesafe bilgisi yoksa sadece "Hayir" yazılır, varsa "Hayir (Xm)" gösterilir.
 
 ---
 

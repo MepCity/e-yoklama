@@ -7,7 +7,9 @@ from database import db
 from models.attendance_session import AttendanceSession
 from models.attendance_record import AttendanceRecord
 from models.course import Course, CourseStudent
+from models.schedule import Schedule
 from models.verification_log import VerificationLog
+from services import verification_service
 
 
 def _generate_code(length=6):
@@ -40,6 +42,17 @@ def start_session(course_id, teacher_id, schedule_id=None,
     course = db.query(Course).filter_by(id=course_id, teacher_id=teacher_id).first()
     if not course:
         return None, 'Ders bulunamadi veya yetkiniz yok.'
+
+    if schedule_id:
+        schedule = db.query(Schedule).filter_by(id=schedule_id, course_id=course_id).first()
+        if not schedule:
+            return None, 'Ders saati bulunamadi.'
+        if latitude is None:
+            latitude = schedule.latitude
+        if longitude is None:
+            longitude = schedule.longitude
+        if radius_m is None:
+            radius_m = schedule.radius_m
 
     now = datetime.utcnow()
     code = _generate_code()
@@ -147,7 +160,8 @@ def get_enrolled_count(course_id):
     return db.query(CourseStudent).filter_by(course_id=course_id).count()
 
 
-def check_in(session_id, student_id, submitted_code, ip_address=None):
+def check_in(session_id, student_id, submitted_code, ip_address=None,
+             latitude=None, longitude=None, override=False, override_reason=None):
     att_session = db.query(AttendanceSession).filter_by(
         id=session_id,
         status='active',
@@ -181,19 +195,40 @@ def check_in(session_id, student_id, submitted_code, ip_address=None):
         _log_verification(None, student_id, session_id, 'code', 'fail', 'CODE_MISMATCH')
         return None, 'Kod hatali.'
 
+    verification = verification_service.validate_context(
+        att_session=att_session,
+        ip_address=ip_address,
+        latitude=latitude,
+        longitude=longitude,
+    )
+    if not verification['ok'] and not override:
+        _log_verification(None, student_id, session_id, verification['failed_layer'], 'fail', verification['reason'])
+        return None, _verification_message(verification)
+
     record = AttendanceRecord(
         session_id=session_id,
         student_id=student_id,
         course_id=att_session.course_id,
-        status='verified',
+        status='verified' if verification['ok'] else 'suspicious',
         submitted_code=normalized_code,
         ip_address=ip_address,
+        ip_match=verification.get('ip_match'),
+        gps_match=verification.get('gps_match'),
+        gps_distance_m=verification.get('gps_distance_m'),
+        override_used=1 if override and not verification['ok'] else 0,
+        override_reason=override_reason if override and not verification['ok'] else None,
     )
     db.add(record)
     db.commit()
     db.refresh(record)
 
     _log_verification(record.id, student_id, session_id, 'code', 'pass', 'CODE_MATCH')
+    if verification.get('ip_match') is not None:
+        _log_verification(record.id, student_id, session_id, 'ip', 'pass' if verification['ip_match'] else 'fail', verification.get('reason'))
+    if verification.get('gps_match') is not None:
+        _log_verification(record.id, student_id, session_id, 'gps', 'pass' if verification['gps_match'] else 'fail', verification.get('reason'))
+    if record.status == 'suspicious':
+        _log_verification(record.id, student_id, session_id, verification['failed_layer'], 'override', verification['reason'])
     return record, None
 
 
@@ -209,3 +244,11 @@ def _log_verification(record_id, student_id, session_id, check_type, check_resul
     db.add(log)
     db.commit()
     return log
+
+
+def _verification_message(verification):
+    if verification['failed_layer'] == 'ip':
+        return 'IP dogrulamasi basarisiz. Yine de devam etmek icin onay verin.'
+    if verification['failed_layer'] == 'gps':
+        return 'GPS dogrulamasi basarisiz. Yine de devam etmek icin onay verin.'
+    return 'Dogrulama basarisiz.'
