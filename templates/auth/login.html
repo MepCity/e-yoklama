@@ -1,65 +1,65 @@
 {% extends 'base.html' %}
-{% block title %}Giris Yap — E-Yoklama{% endblock %}
+{% block title %}Giriş Yap — E-Yoklama{% endblock %}
 
 {% block content %}
 <div class="auth-container">
     <div class="auth-header">
         <h1>E-Yoklama</h1>
-        <p>Akilli Devamsizlik Takip Platformu</p>
+        <p>Akıllı Devamsızlık Takip Platformu</p>
     </div>
 
     <div class="auth-tabs">
-        <button class="tab-btn active" onclick="openTab(event, 'login')">Giris Yap</button>
-        <button class="tab-btn" onclick="openTab(event, 'register')">Kayit Ol</button>
+        <button class="tab-btn active" onclick="openTab(event, 'login')">Giriş Yap</button>
+        <button class="tab-btn" onclick="openTab(event, 'register')">Kayıt Ol</button>
     </div>
 
-    <!-- Giris Formu -->
+    <!-- Giriş Formu -->
     <div id="login" class="tab-content active">
         <form method="POST" action="{{ url_for('auth.login') }}">
             <div class="form-group">
-                <label for="login-username">Kullanici Adi</label>
-                <input type="text" id="login-username" name="username" required placeholder="Kullanici adiniz">
+                <label for="login-username">Kullanıcı Adı</label>
+                <input type="text" id="login-username" name="username" required placeholder="Kullanıcı adınız">
             </div>
             <div class="form-group">
-                <label for="login-password">Sifre</label>
-                <input type="password" id="login-password" name="password" required placeholder="Sifreniz">
+                <label for="login-password">Şifre</label>
+                <input type="password" id="login-password" name="password" required placeholder="Şifreniz">
             </div>
-            <button type="submit" class="btn btn-primary btn-full">Giris Yap</button>
+            <button type="submit" class="btn btn-primary btn-full">Giriş Yap</button>
         </form>
     </div>
 
-    <!-- Kayit Formu -->
+    <!-- Kayıt Formu -->
     <div id="register" class="tab-content">
         <form method="POST" action="{{ url_for('auth.register') }}">
             <div class="form-group">
-                <label for="reg-username">Kullanici Adi *</label>
-                <input type="text" id="reg-username" name="username" required placeholder="Kullanici adiniz">
+                <label for="reg-username">Kullanıcı Adı *</label>
+                <input type="text" id="reg-username" name="username" required placeholder="Kullanıcı adınız">
             </div>
             <div class="form-group">
                 <label for="reg-email">E-posta *</label>
                 <input type="email" id="reg-email" name="email" required placeholder="ornek@marmara.edu.tr">
             </div>
             <div class="form-group">
-                <label for="reg-password">Sifre *</label>
-                <input type="password" id="reg-password" name="password" required placeholder="Sifreniz">
+                <label for="reg-password">Şifre *</label>
+                <input type="password" id="reg-password" name="password" required placeholder="Şifreniz">
             </div>
             <div class="form-group">
-                <label for="reg-student-number">Ogrenci Numarasi *</label>
+                <label for="reg-student-number">Öğrenci Numarası *</label>
                 <input type="text" id="reg-student-number" name="student_number" required placeholder="170423XXX">
             </div>
             <div class="form-group">
-                <label for="reg-department">Bolum</label>
-                <input type="text" id="reg-department" name="department" placeholder="Bilgisayar Muhendisligi">
+                <label for="reg-department">Bölüm</label>
+                <input type="text" id="reg-department" name="department" placeholder="Bilgisayar Mühendisliği">
             </div>
             <div class="form-group">
-                <label for="reg-class">Sinif</label>
-                <input type="text" id="reg-class" name="class_name" placeholder="3. Sinif">
+                <label for="reg-class">Sınıf</label>
+                <input type="text" id="reg-class" name="class_name" placeholder="3. Sınıf">
             </div>
             <div class="form-group">
                 <label for="reg-phone">Telefon</label>
                 <input type="text" id="reg-phone" name="phone" placeholder="05XX XXX XX XX">
             </div>
-            <button type="submit" class="btn btn-primary btn-full">Kayit Ol</button>
+            <button type="submit" class="btn btn-primary btn-full">Kayıt Ol</button>
         </form>
     </div>
 </div>

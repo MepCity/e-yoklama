@@ -1,20 +1,20 @@
 {% extends 'base.html' %}
-{% block title %}Ogrenciler — E-Yoklama{% endblock %}
+{% block title %}Öğrenciler — E-Yoklama{% endblock %}
 {% block content %}
-<h1>Ogrenci Yonetimi</h1>
+<h1>Öğrenci Yönetimi</h1>
 
 <div class="filter-bar">
     <form method="GET" class="filter-form">
         <select name="department" onchange="this.form.submit()">
-            <option value="">Tum Bolumler</option>
+            <option value="">Tüm Bölümler</option>
             {% for dept in departments %}
             <option value="{{ dept }}" {% if request.args.get('department') == dept %}selected{% endif %}>{{ dept }}</option>
             {% endfor %}
         </select>
         <select name="sort" onchange="this.form.submit()">
-            <option value="student_number" {% if request.args.get('sort') == 'student_number' %}selected{% endif %}>Ogrenci No</option>
-            <option value="department" {% if request.args.get('sort') == 'department' %}selected{% endif %}>Bolum</option>
-            <option value="class_name" {% if request.args.get('sort') == 'class_name' %}selected{% endif %}>Sinif</option>
+            <option value="student_number" {% if request.args.get('sort') == 'student_number' %}selected{% endif %}>Öğrenci No</option>
+            <option value="department" {% if request.args.get('sort') == 'department' %}selected{% endif %}>Bölüm</option>
+            <option value="class_name" {% if request.args.get('sort') == 'class_name' %}selected{% endif %}>Sınıf</option>
         </select>
     </form>
 </div>
@@ -23,11 +23,11 @@
     <table>
         <thead>
             <tr>
-                <th>Ogrenci No</th>
-                <th>Kullanici Adi</th>
+                <th>Öğrenci No</th>
+                <th>Kullanıcı Adı</th>
                 <th>E-posta</th>
-                <th>Bolum</th>
-                <th>Sinif</th>
+                <th>Bölüm</th>
+                <th>Sınıf</th>
             </tr>
         </thead>
         <tbody>

@@ -1,22 +1,22 @@
 {% extends 'base.html' %}
-{% block title %}Ogretmenler — E-Yoklama{% endblock %}
+{% block title %}Öğretmenler — E-Yoklama{% endblock %}
 {% block content %}
-<h1>Ogretmen Yonetimi</h1>
+<h1>Öğretmen Yönetimi</h1>
 
 <div class="card">
-    <h3>Yeni Ogretmen Ekle</h3>
+    <h3>Yeni Öğretmen Ekle</h3>
     <form method="POST" action="{{ url_for('admin.add_teacher') }}" class="form-inline">
         <div class="form-group">
-            <input type="text" name="username" required placeholder="Kullanici adi">
+            <input type="text" name="username" required placeholder="Kullanıcı adı">
         </div>
         <div class="form-group">
             <input type="email" name="email" required placeholder="E-posta">
         </div>
         <div class="form-group">
-            <input type="password" name="password" required placeholder="Sifre">
+            <input type="password" name="password" required placeholder="Şifre">
         </div>
         <div class="form-group">
-            <input type="text" name="branch" placeholder="Brans">
+            <input type="text" name="branch" placeholder="Branş">
         </div>
         <button type="submit" class="btn btn-primary">Ekle</button>
     </form>
@@ -27,9 +27,9 @@
         <thead>
             <tr>
                 <th>ID</th>
-                <th>Kullanici Adi</th>
+                <th>Kullanıcı Adı</th>
                 <th>E-posta</th>
-                <th>Brans</th>
+                <th>Branş</th>
             </tr>
         </thead>
         <tbody>

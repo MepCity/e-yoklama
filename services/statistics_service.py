@@ -93,7 +93,7 @@ def get_admin_statistics():
         'dept_stats': sorted(dept_counts.items()),
         'course_stats': course_stats,
         'status_chart': {
-            'labels': ['Katilim', 'Supheli', 'Reddedilen', 'Girilmemis'],
+            'labels': ['Katılım', 'Şüpheli', 'Reddedilen', 'Girilmemiş'],
             'data': [verified_count, suspicious_count, rejected_count, missed_count],
             'colors': ['#27ae60', '#f39c12', '#e74c3c', '#95a5a6'],
         },
@@ -181,7 +181,7 @@ def get_student_statistics(student_id):
         'rate': _rate(total_present, total_expected),
         'course_stats': course_stats,
         'chart_data': {
-            'labels': ['Katilim', 'Supheli', 'Reddedilen', 'Girilmemis'],
+            'labels': ['Katılım', 'Şüpheli', 'Reddedilen', 'Girilmemiş'],
             'data': [total_present, total_suspicious, total_rejected, total_missed],
             'colors': ['#27ae60', '#f39c12', '#e74c3c', '#95a5a6'],
         },

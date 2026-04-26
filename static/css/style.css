@@ -100,6 +100,17 @@ h1 small { font-size: 0.7em; color: #7f8c8d; font-weight: 400; }
     margin-bottom: 0;
 }
 
+.text-center { text-align: center; }
+
+.action-center {
+    text-align: center;
+    margin: 20px 0;
+}
+
+.inline-form {
+    display: inline;
+}
+
 /* ===== Flash Messages ===== */
 .flash-container { margin-bottom: 16px; }
 
@@ -240,6 +251,11 @@ button[type="submit"] {
     max-height: 320px;
 }
 
+.chart-panel-single {
+    max-width: 720px;
+    margin: 20px auto;
+}
+
 /* ===== Forms ===== */
 label {
     display: block;
@@ -290,6 +306,23 @@ input:focus, select:focus, textarea:focus {
 }
 
 .form-inline button { margin-bottom: 0; }
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0 8px;
+    font-weight: 500;
+}
+
+.checkbox-label input {
+    width: auto;
+    margin: 0;
+}
+
+.check-in-form {
+    width: 100%;
+}
 
 /* ===== Filter Bar ===== */
 .filter-bar {
@@ -367,6 +400,11 @@ tr:hover { background: #f8f9fb; }
 
 .qr-hint { color: #7f8c8d; font-size: 0.9rem; }
 
+.qr-image {
+    width: min(250px, 100%);
+    height: auto;
+}
+
 /* ===== Auth & Tabs (login/register) ===== */
 .auth-container {
     max-width: 520px;
@@ -433,6 +471,15 @@ tr:hover { background: #f8f9fb; }
 @media (max-width: 768px) {
     .container { margin: 12px; padding: 16px; }
 
+    .navbar { padding: 12px 16px; }
+
+    .navbar .nav-brand {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+    }
+
     .navbar .nav-toggle { display: block; }
 
     .nav-links {
@@ -457,13 +504,30 @@ tr:hover { background: #f8f9fb; }
 
     .form-inline { flex-direction: column; align-items: stretch; }
     .form-inline .form-group { min-width: auto; }
+    .form-inline .btn, .form-inline button { width: 100%; }
 
     .stats-grid { grid-template-columns: 1fr 1fr; }
 
     .card-grid { grid-template-columns: 1fr; }
 
+    .card-actions { flex-direction: column; }
+    .card-actions .btn { width: 100%; text-align: center; }
+
+    .page-actions { align-items: stretch; }
+    .page-actions .btn { width: 100%; text-align: center; }
+
     .filter-form { flex-direction: column; }
     .filter-form select, .filter-form input { width: 100%; }
+
+    .chart-grid { grid-template-columns: 1fr; }
+    .chart-panel { min-height: 240px; padding: 12px; }
+
+    .qr-section { padding: 20px 14px; }
+    .qr-code {
+        font-size: 1.6rem;
+        width: 100%;
+        overflow-wrap: anywhere;
+    }
 
     table { font-size: 0.85rem; }
     th, td { padding: 8px 10px; }

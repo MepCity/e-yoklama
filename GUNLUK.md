@@ -508,7 +508,7 @@ Faz 1 tamamlandıktan sonra diğer AI'ın önerisiyle sıralama revize edildi:
 | **Faz 6** | İstatistikleri gerçek veriye dayandır + Chart.js (FR-14) | **TAMAMLANDI** |
 | **Faz 7** | Excel export (FR-11) | **TAMAMLANDI** |
 | **Faz 8** | Güvenlik: rate limit, session timeout, expired code | **TAMAMLANDI** |
-| **Faz 9** | Responsive UI cilası + Türkçe lokalizasyon | Bekliyor |
+| **Faz 9** | Responsive UI cilası + Türkçe lokalizasyon | **TAMAMLANDI** |
 | **Faz 10** | Offline destek (FR-23) | Bekliyor |
 | **Faz 11** | Entegrasyon testi + final cleanup | Bekliyor |
 
@@ -866,6 +866,51 @@ Mevcut `attendance_service.check_in()` içindeki süresi dolmuş kod reddi korun
 - Session timeout: eski `last_activity_at` ile korumalı sayfa login'e yönlendirdi.
 - Expired code rejection: süresi dolmuş kodla yoklama reddedildi.
 - QR refresh clamp: 999 saniye isteyen oturum 30 saniyeye sınırlandı.
+
+---
+
+### 19. Faz 9 — Responsive UI Cilası + Türkçe Lokalizasyon (Tamamlandı)
+
+**Tarih:** 2026-04-26
+
+**Kapsam:** NFR-09, NFR-10 — Mobil uyumluluk, okunabilirlik ve Türkçe arayüz tutarlılığı.
+
+#### 19.1. Türkçe Lokalizasyon
+
+**Dosyalar:**
+- `templates/` altındaki admin, öğretmen, öğrenci, auth, hata ve nav template'leri güncellendi.
+- `views/` içindeki kullanıcıya gösterilen flash mesajları Türkçe karakterli hale getirildi.
+- `services/auth_service.py`, `services/attendance_service.py`, `services/export_service.py`, `services/statistics_service.py` kullanıcıya veya export'a yansıyan metinler için güncellendi.
+
+Yapılanlar:
+- `Ogrenci`, `Ogretmen`, `Istatistik`, `Katilim`, `Devamsiz`, `Supheli` gibi ASCII yazımlar düzeltildi.
+- Excel export başlıkları ve durum etiketleri Türkçe karakterli hale getirildi.
+- Hata sayfaları ve navigasyon metinleri tutarlılaştırıldı.
+
+#### 19.2. Responsive UI Cilası
+
+**Dosya:** `static/css/style.css`
+
+Eklenen/düzenlenen stiller:
+- `page-actions`, `action-center`, `inline-form`, `text-center` yardımcı sınıfları.
+- `qr-image` ile QR görseli mobilde taşmayacak hale getirildi.
+- `chart-panel-single` ile tek grafik paneli responsive hale getirildi.
+- `checkbox-label` ve `check-in-form` ile öğrenci yoklama formu mobilde okunur hale getirildi.
+- Mobilde nav brand/toggle hizası, butonların tam genişlik davranışı, kart aksiyonları, grafik panelleri ve QR kod alanı iyileştirildi.
+
+#### 19.3. Template Temizliği
+
+- Öğretmen aktif oturum ekranındaki inline stiller CSS sınıflarına taşındı.
+- Öğretmen istatistik ekranındaki inline grafik genişliği `chart-panel-single` sınıfına taşındı.
+- Navigasyon ve aksiyon butonları küçük ekranlarda daha tutarlı hizalanır hale getirildi.
+
+#### 19.4. Testler
+
+**Geçen testler:**
+- `py_compile` başarılı.
+- Admin/öğretmen/öğrenci temel sayfaları 200 döndü.
+- Login, 404 ve 429 sayfaları render edildi.
+- Türkçe karakterli template'ler Jinja render sırasında hata vermedi.
 
 ---
 

@@ -58,14 +58,14 @@ def add_teacher():
     branch = request.form.get('branch', '').strip()
 
     if not username or not email or not password:
-        flash('Tum zorunlu alanlar doldurulmalidir.', 'error')
+        flash('Tüm zorunlu alanlar doldurulmalıdır.', 'error')
         return redirect(url_for('admin.teachers'))
 
     user, error = auth_service.register_teacher(username, email, password, branch=branch or None)
     if error:
         flash(error, 'error')
     else:
-        flash('Ogretmen basariyla eklendi.', 'success')
+        flash('Öğretmen başarıyla eklendi.', 'success')
     return redirect(url_for('admin.teachers'))
 
 
@@ -89,7 +89,7 @@ def create_course():
     class_name = request.form.get('class_name', '').strip()
 
     if not name or not teacher_id:
-        flash('Ders adi ve ogretmen secimi zorunludur.', 'error')
+        flash('Ders adı ve öğretmen seçimi zorunludur.', 'error')
         return redirect(url_for('admin.courses'))
 
     course = Course(
@@ -102,7 +102,7 @@ def create_course():
     )
     db.add(course)
     db.commit()
-    flash('Ders basariyla olusturuldu.', 'success')
+    flash('Ders başarıyla oluşturuldu.', 'success')
     return redirect(url_for('admin.courses'))
 
 
@@ -113,18 +113,18 @@ def add_student_to_course():
     student_id = request.form.get('student_id', type=int)
 
     if not course_id or not student_id:
-        flash('Ders ve ogrenci secimi zorunludur.', 'error')
+        flash('Ders ve öğrenci seçimi zorunludur.', 'error')
         return redirect(url_for('admin.courses'))
 
     existing = db.query(CourseStudent).filter_by(course_id=course_id, student_id=student_id).first()
     if existing:
-        flash('Bu ogrenci zaten bu derse kayitli.', 'error')
+        flash('Bu öğrenci zaten bu derse kayıtlı.', 'error')
         return redirect(url_for('admin.courses'))
 
     cs = CourseStudent(course_id=course_id, student_id=student_id)
     db.add(cs)
     db.commit()
-    flash('Ogrenci derse eklendi.', 'success')
+    flash('Öğrenci derse eklendi.', 'success')
     return redirect(url_for('admin.courses'))
 
 

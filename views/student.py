@@ -64,9 +64,9 @@ def check_in(session_id):
         return redirect(url_for('student.dashboard'))
 
     if record.status == 'suspicious':
-        flash('Yoklama kaydiniz supheli olarak ogretmen onayina gonderildi.', 'warning')
+        flash('Yoklama kaydınız şüpheli olarak öğretmen onayına gönderildi.', 'warning')
     else:
-        flash('Yoklama kaydiniz dogrulandi.', 'success')
+        flash('Yoklama kaydınız doğrulandı.', 'success')
     return redirect(url_for('student.statistics'))
 
 

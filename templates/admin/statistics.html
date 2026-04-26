@@ -1,19 +1,19 @@
 {% extends 'base.html' %}
-{% block title %}Istatistikler — E-Yoklama{% endblock %}
+{% block title %}İstatistikler — E-Yoklama{% endblock %}
 {% block content %}
 <div class="page-actions">
-    <h1>Sistem Istatistikleri</h1>
-    <a href="{{ url_for('admin.export_all') }}" class="btn">Tum Dersleri Excel Indir</a>
+    <h1>Sistem İstatistikleri</h1>
+    <a href="{{ url_for('admin.export_all') }}" class="btn">Tüm Dersleri Excel İndir</a>
 </div>
 
 <div class="stats-grid">
     <div class="stat-card">
         <h3>{{ total_students }}</h3>
-        <p>Toplam Ogrenci</p>
+        <p>Toplam Öğrenci</p>
     </div>
     <div class="stat-card">
         <h3>{{ total_teachers }}</h3>
-        <p>Toplam Ogretmen</p>
+        <p>Toplam Öğretmen</p>
     </div>
     <div class="stat-card">
         <h3>{{ total_courses }}</h3>
@@ -25,7 +25,7 @@
     </div>
     <div class="stat-card">
         <h3>{{ total_records }}</h3>
-        <p>Girilen Yoklama Kaydi</p>
+        <p>Girilen Yoklama Kaydı</p>
     </div>
     <div class="stat-card">
         <h3>{{ total_expected }}</h3>
@@ -33,19 +33,19 @@
     </div>
     <div class="stat-card">
         <h3>%{{ attendance_rate }}</h3>
-        <p>Genel Katilim Orani</p>
+        <p>Genel Katılım Oranı</p>
     </div>
 </div>
 
-<h2>Yoklama Durum Dagilimi</h2>
+<h2>Yoklama Durum Dağılımı</h2>
 <div class="stats-grid">
     <div class="stat-card">
         <h3>{{ verified_count }}</h3>
-        <p>Katilim</p>
+        <p>Katılım</p>
     </div>
     <div class="stat-card">
         <h3>{{ suspicious_count }}</h3>
-        <p>Supheli</p>
+        <p>Şüpheli</p>
     </div>
     <div class="stat-card">
         <h3>{{ rejected_count }}</h3>
@@ -64,27 +64,27 @@
         <canvas id="statusChart"></canvas>
     </div>
     <div class="chart-panel">
-        <h2>Ders Katilim Oranlari</h2>
+        <h2>Ders Katılım Oranları</h2>
         <canvas id="courseRateChart"></canvas>
     </div>
 </div>
 {% endif %}
 
 {% if course_stats %}
-<h2>Ders Bazli Ozet</h2>
+<h2>Ders Bazlı Özet</h2>
 <div class="table-responsive">
     <table>
         <thead>
             <tr>
                 <th>Ders</th>
                 <th>Oturum</th>
-                <th>Kayitli</th>
+                <th>Kayıtlı</th>
                 <th>Beklenen</th>
-                <th>Katilim</th>
-                <th>Supheli</th>
-                <th>Devamsiz</th>
+                <th>Katılım</th>
+                <th>Şüpheli</th>
+                <th>Devamsız</th>
                 <th>Oran</th>
-                <th>Indir</th>
+                <th>İndir</th>
             </tr>
         </thead>
         <tbody>
@@ -107,11 +107,11 @@
 {% endif %}
 
 {% if dept_stats %}
-<h2>Bolum Bazli Ogrenci Dagilimi</h2>
+<h2>Bölüm Bazlı Öğrenci Dağılımı</h2>
 <div class="table-responsive">
     <table>
         <thead>
-            <tr><th>Bolum</th><th>Ogrenci Sayisi</th></tr>
+            <tr><th>Bölüm</th><th>Öğrenci Sayısı</th></tr>
         </thead>
         <tbody>
             {% for dept, count in dept_stats %}
@@ -145,7 +145,7 @@ new Chart(document.getElementById('courseRateChart'), {
     data: {
         labels: courseRateData.labels,
         datasets: [{
-            label: 'Katilim Orani (%)',
+            label: 'Katılım Oranı (%)',
             data: courseRateData.data,
             backgroundColor: '#3498db'
         }]

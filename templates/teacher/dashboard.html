@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}Ogretmen Paneli — E-Yoklama{% endblock %}
+{% block title %}Öğretmen Paneli — E-Yoklama{% endblock %}
 {% block content %}
 <h1>Derslerim</h1>
 
@@ -10,7 +10,7 @@
         <h3>{{ c.name }}</h3>
         <p>{{ c.code or '' }} — {{ c.department or '' }}</p>
         <div class="card-actions">
-            <a href="{{ url_for('teacher.course_schedule', course_id=c.id) }}" class="btn btn-small">Ders Programi</a>
+            <a href="{{ url_for('teacher.course_schedule', course_id=c.id) }}" class="btn btn-small">Ders Programı</a>
             {% if c.id in active_sessions %}
             <a href="{{ url_for('teacher.active_session', session_id=active_sessions[c.id]) }}" class="btn btn-small btn-primary">Aktif Yoklama</a>
             {% endif %}
@@ -19,6 +19,6 @@
     {% endfor %}
 </div>
 {% else %}
-<p>Henuz atanmis dersiniz bulunmuyor.</p>
+<p>Henüz atanmış dersiniz bulunmuyor.</p>
 {% endif %}
 {% endblock %}

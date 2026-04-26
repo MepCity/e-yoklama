@@ -66,14 +66,14 @@ def create_app(config_name='development'):
                 last_seen = last_seen.replace(tzinfo=timezone.utc)
             if last_seen and (now - last_seen).total_seconds() > timeout_seconds:
                 session.clear()
-                flash('Oturum suresi doldu. Lutfen tekrar giris yapin.', 'warning')
+                flash('Oturum süresi doldu. Lütfen tekrar giriş yapın.', 'warning')
                 return redirect(url_for('auth.login_page'))
 
         session['last_activity_at'] = now.isoformat()
         session.permanent = True
         return None
 
-    # Hata sayfalari
+    # Hata sayfaları
     @app.errorhandler(404)
     def not_found(error):
         return render_template('errors/404.html'), 404

@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}Ogrenci Paneli — E-Yoklama{% endblock %}
+{% block title %}Öğrenci Paneli — E-Yoklama{% endblock %}
 {% block content %}
 <h1>Derslerim</h1>
 
@@ -13,7 +13,7 @@
         {% set active = active_sessions[c.id] %}
         <div class="card-actions">
             {% if active.id in checked_in_sessions %}
-            <p class="status-verified">Bu yoklama oturumuna katildiniz.</p>
+            <p class="status-verified">Bu yoklama oturumuna katıldınız.</p>
             {% else %}
             <form method="POST" action="{{ url_for('student.check_in', session_id=active.id) }}" class="check-in-form">
                 <label for="code-{{ active.id }}">Yoklama Kodu</label>
@@ -27,10 +27,10 @@
                 </div>
                 <label class="checkbox-label">
                     <input type="checkbox" name="override" value="1">
-                    Dogrulama basarisiz olursa Yine de Devam Et
+                    Doğrulama başarısız olursa yine de devam et
                 </label>
-                <input type="text" name="override_reason" placeholder="Aciklama (opsiyonel)">
-                <p class="qr-hint">Kod gecerlilik zamani: {{ active.code_expires_at }}</p>
+                <input type="text" name="override_reason" placeholder="Açıklama (opsiyonel)">
+                <p class="qr-hint">Kod geçerlilik zamanı: {{ active.code_expires_at }}</p>
                 <p class="qr-hint gps-status">Konum bilgisi bekleniyor.</p>
             </form>
             {% endif %}
@@ -40,7 +40,7 @@
     {% endfor %}
 </div>
 {% else %}
-<p>Henuz kayitli dersiniz bulunmuyor.</p>
+<p>Henüz kayıtlı dersiniz bulunmuyor.</p>
 {% endif %}
 {% endblock %}
 
@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', function () {
         forms.forEach(function (form) {
             var status = form.querySelector('.gps-status');
             if (status) {
-                status.textContent = 'Tarayiciniz konum bilgisini desteklemiyor.';
+                status.textContent = 'Tarayıcınız konum bilgisini desteklemiyor.';
             }
         });
         return;
@@ -67,14 +67,14 @@ document.addEventListener('DOMContentLoaded', function () {
             form.querySelector('.gps-longitude').value = position.coords.longitude;
             var status = form.querySelector('.gps-status');
             if (status) {
-                status.textContent = 'Konum bilgisi alindi.';
+                status.textContent = 'Konum bilgisi alındı.';
             }
         });
     }, function () {
         forms.forEach(function (form) {
             var status = form.querySelector('.gps-status');
             if (status) {
-                status.textContent = 'Konum izni verilmedi. Gerekirse yine de devam secenegini kullanin.';
+                status.textContent = 'Konum izni verilmedi. Gerekirse yine de devam seçeneğini kullanın.';
             }
         });
     }, {

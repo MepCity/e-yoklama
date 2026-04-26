@@ -10,11 +10,11 @@
     </div>
     <div class="stat-card">
         <h3>{{ records|length }}</h3>
-        <p>Katilim / {{ enrolled_count }} kayitli</p>
+        <p>Katılım / {{ enrolled_count }} kayıtlı</p>
     </div>
     <div class="stat-card">
         <h3>{{ att_session.code_refresh_seconds }}sn</h3>
-        <p>Kod Yenileme Suresi</p>
+        <p>Kod Yenileme Süresi</p>
     </div>
 </div>
 
@@ -22,34 +22,34 @@
 <div class="qr-section">
     <h2>Yoklama Kodu</h2>
     <div class="qr-code" id="currentCode">{{ att_session.current_code }}</div>
-    <p class="qr-hint">Gecerlilik: <span id="codeExpiresAt">{{ att_session.code_expires_at }}</span></p>
+    <p class="qr-hint">Geçerlilik: <span id="codeExpiresAt">{{ att_session.code_expires_at }}</span></p>
     {% if qr_base64 %}
     <div>
-        <img id="qrImage" src="data:image/png;base64,{{ qr_base64 }}" alt="QR Kod" style="max-width: 250px;">
+        <img id="qrImage" class="qr-image" src="data:image/png;base64,{{ qr_base64 }}" alt="QR Kod">
     </div>
     {% endif %}
-    <p class="qr-hint">Kod her {{ att_session.code_refresh_seconds }} saniyede yenilenir. Ogrenciler bu kodu girerek yoklamaya katilabilir.</p>
-    <p class="qr-hint">Kalan sure: <span id="codeCountdown">-</span></p>
+    <p class="qr-hint">Kod her {{ att_session.code_refresh_seconds }} saniyede yenilenir. Öğrenciler bu kodu girerek yoklamaya katılabilir.</p>
+    <p class="qr-hint">Kalan süre: <span id="codeCountdown">-</span></p>
 </div>
 
-<div style="text-align: center; margin: 20px 0;">
-    <form method="POST" action="{{ url_for('teacher.end_session', session_id=att_session.id) }}" style="display: inline;">
-        <button type="submit" class="btn btn-danger" onclick="return confirm('Yoklama oturumunu sonlandirmak istediginize emin misiniz?')">Oturumu Sonlandir</button>
+<div class="action-center">
+    <form method="POST" action="{{ url_for('teacher.end_session', session_id=att_session.id) }}" class="inline-form">
+        <button type="submit" class="btn btn-danger" onclick="return confirm('Yoklama oturumunu sonlandırmak istediğinize emin misiniz?')">Oturumu Sonlandır</button>
     </form>
 </div>
 {% else %}
-<div class="card" style="text-align: center;">
-    <p>Bu oturum <strong>{{ att_session.ended_at }}</strong> tarihinde sonlandirilmistir.</p>
+<div class="card text-center">
+    <p>Bu oturum <strong>{{ att_session.ended_at }}</strong> tarihinde sonlandırılmıştır.</p>
 </div>
 {% endif %}
 
 {% if suspicious_records %}
-<h2>Supheli Yoklamalar</h2>
+<h2>Şüpheli Yoklamalar</h2>
 <div class="table-responsive">
     <table>
         <thead>
             <tr>
-                <th>Ogrenci No</th>
+                <th>Öğrenci No</th>
                 <th>Ad</th>
                 <th>Neden</th>
                 <th>IP</th>
@@ -63,12 +63,12 @@
             <tr>
                 <td>{{ r.student.student_number or '-' }}</td>
                 <td>{{ r.student.username }}</td>
-                <td>{{ r.override_reason or 'Dogrulama basarisiz' }}</td>
+                <td>{{ r.override_reason or 'Doğrulama başarısız' }}</td>
                 <td>
                     {% if r.ip_match == 1 %}
                         Uygun
                     {% elif r.ip_match == 0 %}
-                        Uygun degil
+                        Uygun değil
                     {% else %}
                         -
                     {% endif %}
@@ -78,7 +78,7 @@
                     {% if r.gps_match == 1 %}
                         Uygun
                     {% elif r.gps_match == 0 %}
-                        Uygun degil{% if r.gps_distance_m is not none %} ({{ r.gps_distance_m|round(0) }}m){% endif %}
+                        Uygun değil{% if r.gps_distance_m is not none %} ({{ r.gps_distance_m|round(0) }}m){% endif %}
                     {% else %}
                         -
                     {% endif %}
@@ -86,7 +86,7 @@
                 <td>{{ format_datetime(r.submitted_at) }}</td>
                 <td>
                     <form method="POST" action="{{ url_for('teacher.resolve_suspicious', record_id=r.id) }}" class="form-inline">
-                        <input type="text" name="note" placeholder="Not" aria-label="Inceleme notu">
+                        <input type="text" name="note" placeholder="Not" aria-label="İnceleme notu">
                         <button type="submit" name="decision" value="approve" class="btn btn-small btn-primary">Onayla</button>
                         <button type="submit" name="decision" value="reject" class="btn btn-small btn-danger">Reddet</button>
                     </form>
@@ -98,19 +98,19 @@
 </div>
 {% endif %}
 
-<h2>Katilim Listesi</h2>
+<h2>Katılım Listesi</h2>
 {% if records %}
 <div class="table-responsive">
     <table>
         <thead>
             <tr>
-                <th>Ogrenci No</th>
+                <th>Öğrenci No</th>
                 <th>Ad</th>
                 <th>Durum</th>
                 <th>Saat</th>
                 <th>IP</th>
-                <th>IP Eslesmesi</th>
-                <th>GPS Eslesmesi</th>
+                <th>IP Eşleşmesi</th>
+                <th>GPS Eşleşmesi</th>
             </tr>
         </thead>
         <tbody>
@@ -123,18 +123,18 @@
                 </td>
                 <td>{{ format_datetime(r.submitted_at) }}</td>
                 <td>{{ r.ip_address or '-' }}</td>
-                <td>{% if r.ip_match == 1 %}Evet{% elif r.ip_match == 0 %}Hayir{% else %}-{% endif %}</td>
-                <td>{% if r.gps_match == 1 %}Evet{% elif r.gps_match == 0 %}Hayir{% if r.gps_distance_m is not none %} ({{ r.gps_distance_m|round(0) }}m){% endif %}{% else %}-{% endif %}</td>
+                <td>{% if r.ip_match == 1 %}Evet{% elif r.ip_match == 0 %}Hayır{% else %}-{% endif %}</td>
+                <td>{% if r.gps_match == 1 %}Evet{% elif r.gps_match == 0 %}Hayır{% if r.gps_distance_m is not none %} ({{ r.gps_distance_m|round(0) }}m){% endif %}{% else %}-{% endif %}</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
 {% else %}
-<p>Henuz katilim kaydi yok.</p>
+<p>Henüz katılım kaydı yok.</p>
 {% endif %}
 
-<a href="{{ url_for('teacher.course_schedule', course_id=att_session.course_id) }}" class="btn">Ders Programina Don</a>
+<a href="{{ url_for('teacher.course_schedule', course_id=att_session.course_id) }}" class="btn">Ders Programına Dön</a>
 {% endblock %}
 
 {% block scripts %}

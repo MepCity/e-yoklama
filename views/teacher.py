@@ -30,7 +30,7 @@ def course_schedule(course_id):
     user_id = session['user']['id']
     course = db.query(Course).filter_by(id=course_id, teacher_id=user_id).first()
     if not course:
-        flash('Ders bulunamadi.', 'error')
+        flash('Ders bulunamadı.', 'error')
         return redirect(url_for('teacher.dashboard'))
 
     if request.method == 'POST':
@@ -51,7 +51,7 @@ def course_schedule(course_id):
             db.commit()
             flash('Ders saati eklendi.', 'success')
         else:
-            flash('Tum alanlar doldurulmalidir.', 'error')
+            flash('Tüm alanlar doldurulmalıdır.', 'error')
 
     schedules = db.query(Schedule).filter_by(course_id=course_id).order_by(Schedule.day_of_week).all()
     active_session = attendance_service.get_active_session(course_id)
@@ -87,7 +87,7 @@ def start_session(course_id):
         flash(error, 'error')
         return redirect(url_for('teacher.course_schedule', course_id=course_id))
 
-    flash('Yoklama oturumu baslatildi.', 'success')
+    flash('Yoklama oturumu başlatıldı.', 'success')
     return redirect(url_for('teacher.active_session', session_id=att_session.id))
 
 
@@ -97,7 +97,7 @@ def active_session(session_id):
     user_id = session['user']['id']
     att_session = attendance_service.get_session_by_id(session_id)
     if not att_session or att_session.teacher_id != user_id:
-        flash('Oturum bulunamadi.', 'error')
+        flash('Oturum bulunamadı.', 'error')
         return redirect(url_for('teacher.dashboard'))
 
     if att_session.status == 'active' and attendance_service.is_code_expired(att_session):
@@ -127,7 +127,7 @@ def end_session(session_id):
         flash(error, 'error')
         return redirect(url_for('teacher.dashboard'))
 
-    flash('Yoklama oturumu sonlandirildi.', 'success')
+    flash('Yoklama oturumu sonlandırıldı.', 'success')
     return redirect(url_for('teacher.active_session', session_id=session_id))
 
 
@@ -144,9 +144,9 @@ def resolve_suspicious(record_id):
         return redirect(url_for('teacher.dashboard'))
 
     if record.status == 'approved':
-        flash('Supheli yoklama onaylandi.', 'success')
+        flash('Şüpheli yoklama onaylandı.', 'success')
     else:
-        flash('Supheli yoklama reddedildi.', 'warning')
+        flash('Şüpheli yoklama reddedildi.', 'warning')
     return redirect(url_for('teacher.active_session', session_id=record.session_id))
 
 
@@ -164,7 +164,7 @@ def export_course(course_id):
     user_id = session['user']['id']
     course = db.query(Course).filter_by(id=course_id, teacher_id=user_id).first()
     if not course:
-        flash('Ders bulunamadi veya yetkiniz yok.', 'error')
+        flash('Ders bulunamadı veya yetkiniz yok.', 'error')
         return redirect(url_for('teacher.statistics'))
     result, filename_or_error = export_service.export_course_attendance(course_id)
     if result is None:

@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% block title %}Istatistiklerim — E-Yoklama{% endblock %}
+{% block title %}İstatistiklerim — E-Yoklama{% endblock %}
 {% block content %}
-<h1>Ders Istatistikleri</h1>
+<h1>Ders İstatistikleri</h1>
 
 {% if course_stats %}
 <div class="stats-grid">
@@ -9,28 +9,28 @@
     <div class="stat-card">
         <h3>{{ cs.course.name }}</h3>
         <p class="stat-number">%{{ cs.rate }}</p>
-        <p>Katilim Orani</p>
-        <p>{{ cs.present }} katilim / {{ cs.total }} beklenen</p>
-        <p>{{ cs.session_count }} oturum, {{ cs.enrolled_count }} kayitli</p>
+        <p>Katılım Oranı</p>
+        <p>{{ cs.present }} katılım / {{ cs.total }} beklenen</p>
+        <p>{{ cs.session_count }} oturum, {{ cs.enrolled_count }} kayıtlı</p>
     </div>
     {% endfor %}
 </div>
 
-<h2>Detayli Tablo</h2>
+<h2>Detaylı Tablo</h2>
 <div class="table-responsive">
     <table>
         <thead>
             <tr>
                 <th>Ders</th>
                 <th>Oturum</th>
-                <th>Kayitli</th>
+                <th>Kayıtlı</th>
                 <th>Beklenen</th>
                 <th>Girilen</th>
-                <th>Katilim</th>
-                <th>Supheli</th>
-                <th>Devamsiz</th>
+                <th>Katılım</th>
+                <th>Şüpheli</th>
+                <th>Devamsız</th>
                 <th>Oran</th>
-                <th>Indir</th>
+                <th>İndir</th>
             </tr>
         </thead>
         <tbody>
@@ -53,14 +53,14 @@
 </div>
 
 {% if course_stats|length > 0 %}
-<h2>Katilim Grafigi</h2>
-<div style="max-width: 600px; margin: 20px auto;">
+<h2>Katılım Grafiği</h2>
+<div class="chart-panel chart-panel-single">
     <canvas id="attendanceChart"></canvas>
 </div>
 {% endif %}
 
 {% else %}
-<p>Henuz yoklama verisi bulunmuyor.</p>
+<p>Henüz yoklama verisi bulunmuyor.</p>
 {% endif %}
 {% endblock %}
 
@@ -74,15 +74,15 @@ new Chart(ctx, {
     data: {
         labels: chartData.labels,
         datasets: [{
-            label: 'Katilim',
+            label: 'Katılım',
             data: chartData.present,
             backgroundColor: '#27ae60'
         }, {
-            label: 'Supheli',
+            label: 'Şüpheli',
             data: chartData.suspicious,
             backgroundColor: '#f39c12'
         }, {
-            label: 'Devamsiz',
+            label: 'Devamsız',
             data: chartData.absent,
             backgroundColor: '#e74c3c'
         }]

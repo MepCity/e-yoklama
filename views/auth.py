@@ -21,7 +21,7 @@ def login():
     password = request.form.get('password', '')
 
     if not username or not password:
-        flash('Kullanici adi ve sifre gereklidir.', 'error')
+        flash('Kullanıcı adı ve şifre gereklidir.', 'error')
         return redirect(url_for('auth.login_page'))
 
     user, error = auth_service.login(username, password)
@@ -53,7 +53,7 @@ def register():
     phone = request.form.get('phone', '').strip()
 
     if not username or not email or not password or not student_number:
-        flash('Tum zorunlu alanlar doldurulmalidir.', 'error')
+        flash('Tüm zorunlu alanlar doldurulmalıdır.', 'error')
         return redirect(url_for('auth.login_page'))
 
     user, error = auth_service.register_student(
@@ -69,12 +69,12 @@ def register():
         flash(error, 'error')
         return redirect(url_for('auth.login_page'))
 
-    flash('Kayit basarili! Giris yapabilirsiniz.', 'success')
+    flash('Kayıt başarılı! Giriş yapabilirsiniz.', 'success')
     return redirect(url_for('auth.login_page'))
 
 
 @auth_bp.route('/logout')
 def logout():
     session.clear()
-    flash('Basariyla cikis yapildi.', 'success')
+    flash('Başarıyla çıkış yapıldı.', 'success')
     return redirect(url_for('auth.login_page'))

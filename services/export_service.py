@@ -13,10 +13,10 @@ from models.user import User
 PRESENT_STATUSES = ('verified', 'approved', 'manual')
 
 STATUS_TR = {
-    'verified': 'Dogrulandi',
-    'approved': 'Onaylandi',
+    'verified': 'Doğrulandı',
+    'approved': 'Onaylandı',
     'manual': 'Manuel',
-    'suspicious': 'Supheli',
+    'suspicious': 'Şüpheli',
     'rejected': 'Reddedildi',
 }
 
@@ -89,14 +89,14 @@ def _rate(part, total):
 def export_course_attendance(course_id):
     course = db.query(Course).filter_by(id=course_id).first()
     if not course:
-        return None, 'Ders bulunamadi.'
+        return None, 'Ders bulunamadı.'
 
     wb = Workbook()
 
     # --- Sheet 1: Oturum Detayi ---
     ws1 = wb.active
-    ws1.title = 'Yoklama Kayitlari'
-    headers = ['Ogrenci No', 'Ad', 'Oturum Tarihi', 'Durum', 'Kod', 'IP', 'GPS Mesafe (m)', 'Gonderim Zamani']
+    ws1.title = 'Yoklama Kayıtları'
+    headers = ['Öğrenci No', 'Ad', 'Oturum Tarihi', 'Durum', 'Kod', 'IP', 'GPS Mesafe (m)', 'Gönderim Zamanı']
     ws1.append(headers)
     _style_header(ws1, 1, len(headers))
 
@@ -138,9 +138,9 @@ def export_course_attendance(course_id):
 
     _auto_width(ws1)
 
-    # --- Sheet 2: Ogrenci Ozet ---
-    ws2 = wb.create_sheet('Ogrenci Ozet')
-    headers2 = ['Ogrenci No', 'Ad', 'Bolum', 'Toplam Oturum', 'Katilim', 'Supheli', 'Devamsiz', 'Oran (%)']
+    # --- Sheet 2: Öğrenci Özet ---
+    ws2 = wb.create_sheet('Öğrenci Özet')
+    headers2 = ['Öğrenci No', 'Ad', 'Bölüm', 'Toplam Oturum', 'Katılım', 'Şüpheli', 'Devamsız', 'Oran (%)']
     ws2.append(headers2)
     _style_header(ws2, 1, len(headers2))
 
@@ -188,15 +188,15 @@ def export_all_courses():
     courses = db.query(Course).order_by(Course.name).all()
     if not courses:
         ws = wb.create_sheet('Bos')
-        ws.append(['Henuz ders bulunmuyor.'])
+        ws.append(['Henüz ders bulunmuyor.'])
         buf = BytesIO()
         wb.save(buf)
         buf.seek(0)
         return buf, 'tum_dersler_yoklama.xlsx'
 
     # --- Genel Ozet sheet ---
-    ws_summary = wb.create_sheet('Genel Ozet')
-    headers = ['Ders', 'Kod', 'Ogretmen', 'Oturum', 'Kayitli', 'Beklenen', 'Katilim', 'Supheli', 'Devamsiz', 'Oran (%)']
+    ws_summary = wb.create_sheet('Genel Özet')
+    headers = ['Ders', 'Kod', 'Öğretmen', 'Oturum', 'Kayıtlı', 'Beklenen', 'Katılım', 'Şüpheli', 'Devamsız', 'Oran (%)']
     ws_summary.append(headers)
     _style_header(ws_summary, 1, len(headers))
 
@@ -234,7 +234,7 @@ def export_all_courses():
     for course in courses:
         sheet_name = _safe_sheet_title(course.code or course.name, used_titles)
         ws = wb.create_sheet(sheet_name)
-        headers = ['Ogrenci No', 'Ad', 'Bolum', 'Oturum Sayisi', 'Katilim', 'Supheli', 'Devamsiz', 'Oran (%)']
+        headers = ['Öğrenci No', 'Ad', 'Bölüm', 'Oturum Sayısı', 'Katılım', 'Şüpheli', 'Devamsız', 'Oran (%)']
         ws.append(headers)
         _style_header(ws, 1, len(headers))
 

@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% block title %}Yoklama Istatistiklerim — E-Yoklama{% endblock %}
+{% block title %}Yoklama İstatistiklerim — E-Yoklama{% endblock %}
 {% block content %}
-<h1>Yoklama Istatistiklerim</h1>
+<h1>Yoklama İstatistiklerim</h1>
 
 <div class="stats-grid">
     <div class="stat-card">
@@ -10,24 +10,24 @@
     </div>
     <div class="stat-card">
         <h3>{{ present }}</h3>
-        <p>Katilim</p>
+        <p>Katılım</p>
     </div>
     <div class="stat-card">
         <h3>{{ suspicious }}</h3>
-        <p>Supheli</p>
+        <p>Şüpheli</p>
     </div>
     <div class="stat-card">
         <h3>{{ absent }}</h3>
-        <p>Devamsiz</p>
+        <p>Devamsız</p>
     </div>
     <div class="stat-card">
         <p class="stat-number">%{{ rate }}</p>
-        <p>Genel Katilim Orani</p>
+        <p>Genel Katılım Oranı</p>
     </div>
 </div>
 
 {% if course_stats %}
-<h2>Ders Bazli Detay</h2>
+<h2>Ders Bazlı Detay</h2>
 <div class="table-responsive">
     <table>
         <thead>
@@ -35,9 +35,9 @@
                 <th>Ders</th>
                 <th>Beklenen</th>
                 <th>Girilen</th>
-                <th>Katilim</th>
-                <th>Supheli</th>
-                <th>Devamsiz</th>
+                <th>Katılım</th>
+                <th>Şüpheli</th>
+                <th>Devamsız</th>
                 <th>Oran</th>
             </tr>
         </thead>
@@ -58,7 +58,7 @@
 </div>
 
 {% if course_stats|length > 0 %}
-<h2>Katilim Grafigi</h2>
+<h2>Katılım Grafiği</h2>
 <div class="chart-grid">
     <div class="chart-panel">
         <canvas id="studentChart"></canvas>
@@ -70,7 +70,7 @@
 {% endif %}
 
 {% else %}
-<p>Henuz yoklama kaydiniz bulunmuyor.</p>
+<p>Henüz yoklama kaydınız bulunmuyor.</p>
 {% endif %}
 {% endblock %}
 
@@ -97,7 +97,7 @@ new Chart(document.getElementById('studentRateChart'), {
     data: {
         labels: courseRateData.labels,
         datasets: [{
-            label: 'Katilim Orani (%)',
+            label: 'Katılım Oranı (%)',
             data: courseRateData.data,
             backgroundColor: '#3498db'
         }]

@@ -1,15 +1,15 @@
 {% extends 'base.html' %}
 {% block title %}Dersler — E-Yoklama{% endblock %}
 {% block content %}
-<h1>Ders Yonetimi</h1>
+<h1>Ders Yönetimi</h1>
 
 <div class="card">
-    <h3>Yeni Ders Olustur</h3>
+    <h3>Yeni Ders Oluştur</h3>
     <form method="POST" action="{{ url_for('admin.create_course') }}">
         <div class="form-row">
             <div class="form-group">
-                <label>Ders Adi *</label>
-                <input type="text" name="name" required placeholder="Yazilim Muhendisligi">
+                <label>Ders Adı *</label>
+                <input type="text" name="name" required placeholder="Yazılım Mühendisliği">
             </div>
             <div class="form-group">
                 <label>Ders Kodu</label>
@@ -17,38 +17,38 @@
             </div>
         </div>
         <div class="form-group">
-            <label>Aciklama</label>
-            <input type="text" name="description" placeholder="Ders aciklamasi">
+            <label>Açıklama</label>
+            <input type="text" name="description" placeholder="Ders açıklaması">
         </div>
         <div class="form-row">
             <div class="form-group">
-                <label>Ogretmen *</label>
+                <label>Öğretmen *</label>
                 <select name="teacher_id" required>
-                    <option value="">Seciniz</option>
+                    <option value="">Seçiniz</option>
                     {% for t in teachers %}
                     <option value="{{ t.id }}">{{ t.username }} ({{ t.branch or '-' }})</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="form-group">
-                <label>Bolum</label>
-                <input type="text" name="department" placeholder="Bilgisayar Muhendisligi">
+                <label>Bölüm</label>
+                <input type="text" name="department" placeholder="Bilgisayar Mühendisliği">
             </div>
             <div class="form-group">
-                <label>Sinif</label>
-                <input type="text" name="class_name" placeholder="3. Sinif">
+                <label>Sınıf</label>
+                <input type="text" name="class_name" placeholder="3. Sınıf">
             </div>
         </div>
-        <button type="submit" class="btn btn-primary">Ders Olustur</button>
+        <button type="submit" class="btn btn-primary">Ders Oluştur</button>
     </form>
 </div>
 
 <div class="card">
-    <h3>Derse Ogrenci Ekle</h3>
+    <h3>Derse Öğrenci Ekle</h3>
     <form method="POST" action="{{ url_for('admin.add_student_to_course') }}" class="form-inline">
         <div class="form-group">
             <select name="course_id" required>
-                <option value="">Ders Seciniz</option>
+                <option value="">Ders Seçiniz</option>
                 {% for c in courses %}
                 <option value="{{ c.id }}">{{ c.name }} ({{ c.code or '-' }})</option>
                 {% endfor %}
@@ -56,7 +56,7 @@
         </div>
         <div class="form-group">
             <select name="student_id" required>
-                <option value="">Ogrenci Seciniz</option>
+                <option value="">Öğrenci Seçiniz</option>
                 {% for s in students %}
                 <option value="{{ s.id }}">{{ s.student_number }} — {{ s.username }}</option>
                 {% endfor %}
@@ -72,9 +72,9 @@
         <thead>
             <tr>
                 <th>Kod</th>
-                <th>Ders Adi</th>
-                <th>Ogretmen</th>
-                <th>Bolum</th>
+                <th>Ders Adı</th>
+                <th>Öğretmen</th>
+                <th>Bölüm</th>
             </tr>
         </thead>
         <tbody>
