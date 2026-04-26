@@ -1,8 +1,9 @@
-from flask import Blueprint, render_template, session, redirect, url_for
+from flask import Blueprint, render_template, session, redirect, url_for, request, flash
 from utils.decorators import role_required
 from database import db
 from models.course import Course, CourseStudent
 from models.attendance_record import AttendanceRecord
+from services import attendance_service
 
 student_bp = Blueprint('student', __name__)
 
@@ -13,11 +14,47 @@ def dashboard():
     user_id = session['user']['id']
     enrollments = db.query(CourseStudent).filter(CourseStudent.student_id == user_id).all()
     my_courses = []
+    active_sessions = {}
+    checked_in_sessions = set()
     for cs in enrollments:
         course = db.query(Course).filter_by(id=cs.course_id).first()
         if course:
             my_courses.append(course)
-    return render_template('student/dashboard.html', courses=my_courses)
+            active = attendance_service.get_active_session_for_student(course.id, user_id)
+            if active:
+                active_sessions[course.id] = active
+                existing = db.query(AttendanceRecord).filter_by(
+                    session_id=active.id,
+                    student_id=user_id,
+                ).first()
+                if existing:
+                    checked_in_sessions.add(active.id)
+    return render_template(
+        'student/dashboard.html',
+        courses=my_courses,
+        active_sessions=active_sessions,
+        checked_in_sessions=checked_in_sessions,
+    )
+
+
+@student_bp.route('/session/<session_id>/check-in', methods=['POST'])
+@role_required(2)
+def check_in(session_id):
+    user_id = session['user']['id']
+    submitted_code = request.form.get('code', '')
+
+    record, error = attendance_service.check_in(
+        session_id=session_id,
+        student_id=user_id,
+        submitted_code=submitted_code,
+        ip_address=request.remote_addr,
+    )
+    if error:
+        flash(error, 'error')
+        return redirect(url_for('student.dashboard'))
+
+    flash('Yoklama kaydiniz dogrulandi.', 'success')
+    return redirect(url_for('student.statistics'))
 
 
 @student_bp.route('/statistics')

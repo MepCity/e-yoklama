@@ -9,6 +9,25 @@
     <div class="card">
         <h3>{{ c.name }}</h3>
         <p>{{ c.code or '' }} — {{ c.department or '' }}</p>
+        {% if c.id in active_sessions %}
+        {% set active = active_sessions[c.id] %}
+        <div class="card-actions">
+            {% if active.id in checked_in_sessions %}
+            <p class="status-verified">Bu yoklama oturumuna katildiniz.</p>
+            {% else %}
+            <form method="POST" action="{{ url_for('student.check_in', session_id=active.id) }}" class="check-in-form">
+                <label for="code-{{ active.id }}">Yoklama Kodu</label>
+                <div class="form-inline">
+                    <div class="form-group">
+                        <input id="code-{{ active.id }}" type="text" name="code" required maxlength="20" placeholder="Kodu girin">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Yoklama Ver</button>
+                </div>
+                <p class="qr-hint">Kod gecerlilik zamani: {{ active.code_expires_at }}</p>
+            </form>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
     {% endfor %}
 </div>
