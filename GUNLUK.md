@@ -504,7 +504,7 @@ Faz 1 tamamlandıktan sonra diğer AI'ın önerisiyle sıralama revize edildi:
 | **Faz 2** | Dinamik QR kod + süreli kod doğrulama | **TAMAMLANDI** |
 | **Faz 3** | Öğrenci yoklama akışı + duplicate check (FR-15) | **TAMAMLANDI** |
 | **Faz 4** | IP/GPS doğrulama + "Yine de Devam Et" (FR-06, FR-07) | **TAMAMLANDI** |
-| **Faz 5** | Şüpheli yoklama yönetimi — öğretmen onay/ret (FR-08, FR-09) | Bekliyor |
+| **Faz 5** | Şüpheli yoklama yönetimi — öğretmen onay/ret (FR-08, FR-09) | **TAMAMLANDI** |
 | **Faz 6** | İstatistikleri gerçek veriye dayandır + Chart.js (FR-14) | Bekliyor |
 | **Faz 7** | Excel export (FR-11) | Bekliyor |
 | **Faz 8** | Güvenlik: rate limit, session timeout, expired code | Bekliyor |
@@ -684,6 +684,43 @@ Not: Lokal geliştirme/test için `127.0.0.1` ve `::1` IP adresleri bypass edili
 **Sorun:** GPS koordinatları gönderilmediğinde `gps_match=0` ama `gps_distance_m=None` oluyordu. Template'teki `{{ r.gps_distance_m|round(0) }}` ifadesi None üzerinde `round()` çağırınca `TypeError: type NoneType doesn't define __round__ method` hatası veriyordu. Bu hata öğretmenin aktif oturum sayfasını tamamen kırıyordu (500 hatası).
 
 **Düzeltme:** `{% if r.gps_distance_m is not none %}` kontrolü eklendi. Mesafe bilgisi yoksa sadece "Hayir" yazılır, varsa "Hayir (Xm)" gösterilir.
+
+---
+
+### 15. Faz 5 — Şüpheli Yoklama Yönetimi (Tamamlandı)
+
+**Tarih:** 2026-04-26
+
+**Kapsam:** FR-08, FR-09 — Öğretmenin şüpheli yoklamaları görmesi, incelemesi ve onay/ret kararı vermesi.
+
+#### 15.1. Attendance Service Güncellemeleri
+
+**Dosya:** `services/attendance_service.py`
+
+Eklenen fonksiyonlar:
+- `get_suspicious_records(session_id)` — Bir yoklama oturumundaki `status='suspicious'` kayıtları listeler.
+- `resolve_suspicious(record_id, teacher_id, decision, note=None)` — Öğretmen sahiplik kontrolü yaparak şüpheli kaydı onaylar veya reddeder.
+
+Karar sonucu:
+- `approve` → kayıt `status='approved'` olur.
+- `reject` → kayıt `status='rejected'` olur.
+- `reviewed_by`, `reviewed_at`, `review_note` alanları doldurulur.
+- Karar `VerificationLog` tablosuna `review` adımı olarak yazılır.
+
+#### 15.2. Teacher View + Template Güncellemeleri
+
+**Dosyalar:**
+- `views/teacher.py` — Aktif oturum sayfasına şüpheli kayıt listesi gönderildi. `POST /teacher/records/<record_id>/resolve` route'u eklendi.
+- `templates/teacher/active_session.html` — "Şüpheli Yoklamalar" tablosu eklendi. Öğretmen her kayıt için not girip "Onayla" veya "Reddet" kararı verebilir.
+
+#### 15.3. Testler
+
+**Geçen testler:**
+- `py_compile` başarılı.
+- Servis testi: şüpheli kayıt listelendi, onay kararıyla `approved`, ret kararıyla `rejected` durumuna geçti.
+- Sahip olmayan öğretmenin inceleme yapması engellendi.
+- Aynı kayıt ikinci kez incelenemedi.
+- HTTP testi: öğretmen aktif oturum sayfasında şüpheli tabloyu gördü, POST ile onay kararı kayda işlendi.
 
 ---
 

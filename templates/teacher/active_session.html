@@ -43,6 +43,61 @@
 </div>
 {% endif %}
 
+{% if suspicious_records %}
+<h2>Supheli Yoklamalar</h2>
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>Ogrenci No</th>
+                <th>Ad</th>
+                <th>Neden</th>
+                <th>IP</th>
+                <th>GPS</th>
+                <th>Saat</th>
+                <th>Karar</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in suspicious_records %}
+            <tr>
+                <td>{{ r.student.student_number or '-' }}</td>
+                <td>{{ r.student.username }}</td>
+                <td>{{ r.override_reason or 'Dogrulama basarisiz' }}</td>
+                <td>
+                    {% if r.ip_match == 1 %}
+                        Uygun
+                    {% elif r.ip_match == 0 %}
+                        Uygun degil
+                    {% else %}
+                        -
+                    {% endif %}
+                    {% if r.ip_address %}<br><small>{{ r.ip_address }}</small>{% endif %}
+                </td>
+                <td>
+                    {% if r.gps_match == 1 %}
+                        Uygun
+                    {% elif r.gps_match == 0 %}
+                        Uygun degil{% if r.gps_distance_m is not none %} ({{ r.gps_distance_m|round(0) }}m){% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>{{ format_datetime(r.submitted_at) }}</td>
+                <td>
+                    <form method="POST" action="{{ url_for('teacher.resolve_suspicious', record_id=r.id) }}" class="form-inline">
+                        <input type="text" name="note" placeholder="Not" aria-label="Inceleme notu">
+                        <button type="submit" name="decision" value="approve" class="btn btn-small btn-primary">Onayla</button>
+                        <button type="submit" name="decision" value="reject" class="btn btn-small btn-danger">Reddet</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
 <h2>Katilim Listesi</h2>
 {% if records %}
 <div class="table-responsive">

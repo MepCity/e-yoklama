@@ -156,8 +156,46 @@ def get_session_records(session_id):
     ).order_by(AttendanceRecord.submitted_at.desc()).all()
 
 
+def get_suspicious_records(session_id):
+    return db.query(AttendanceRecord).filter_by(
+        session_id=session_id,
+        status='suspicious',
+    ).order_by(AttendanceRecord.submitted_at.asc()).all()
+
+
 def get_enrolled_count(course_id):
     return db.query(CourseStudent).filter_by(course_id=course_id).count()
+
+
+def resolve_suspicious(record_id, teacher_id, decision, note=None):
+    record = db.query(AttendanceRecord).filter_by(id=record_id).first()
+    if not record:
+        return None, 'Kayit bulunamadi.'
+
+    att_session = db.query(AttendanceSession).filter_by(id=record.session_id).first()
+    if not att_session or att_session.teacher_id != teacher_id:
+        return None, 'Bu kaydi inceleme yetkiniz yok.'
+
+    if record.status != 'suspicious':
+        return None, 'Bu kayit supheli durumda degil.'
+
+    if decision == 'approve':
+        record.status = 'approved'
+        result_detail = 'SUSPICIOUS_APPROVED'
+    elif decision == 'reject':
+        record.status = 'rejected'
+        result_detail = 'SUSPICIOUS_REJECTED'
+    else:
+        return None, 'Gecersiz karar.'
+
+    record.reviewed_by = teacher_id
+    record.reviewed_at = _now_iso()
+    record.review_note = note
+    db.commit()
+    db.refresh(record)
+
+    _log_verification(record.id, record.student_id, record.session_id, 'review', decision, result_detail)
+    return record, None
 
 
 def check_in(session_id, student_id, submitted_code, ip_address=None,

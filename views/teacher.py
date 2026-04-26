@@ -103,6 +103,7 @@ def active_session(session_id):
         att_session = attendance_service.refresh_code(att_session.id)
 
     records = attendance_service.get_session_records(session_id)
+    suspicious_records = attendance_service.get_suspicious_records(session_id)
     enrolled_count = attendance_service.get_enrolled_count(att_session.course_id)
 
     qr_data = att_session.current_code
@@ -111,6 +112,7 @@ def active_session(session_id):
     return render_template('teacher/active_session.html',
                            att_session=att_session,
                            records=records,
+                           suspicious_records=suspicious_records,
                            enrolled_count=enrolled_count,
                            qr_base64=qr_base64)
 
@@ -126,6 +128,25 @@ def end_session(session_id):
 
     flash('Yoklama oturumu sonlandirildi.', 'success')
     return redirect(url_for('teacher.active_session', session_id=session_id))
+
+
+@teacher_bp.route('/records/<int:record_id>/resolve', methods=['POST'])
+@role_required(1)
+def resolve_suspicious(record_id):
+    user_id = session['user']['id']
+    decision = request.form.get('decision', '').strip()
+    note = request.form.get('note', '').strip() or None
+
+    record, error = attendance_service.resolve_suspicious(record_id, user_id, decision, note)
+    if error:
+        flash(error, 'error')
+        return redirect(url_for('teacher.dashboard'))
+
+    if record.status == 'approved':
+        flash('Supheli yoklama onaylandi.', 'success')
+    else:
+        flash('Supheli yoklama reddedildi.', 'warning')
+    return redirect(url_for('teacher.active_session', session_id=record.session_id))
 
 
 @teacher_bp.route('/statistics')
