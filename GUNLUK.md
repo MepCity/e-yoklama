@@ -509,8 +509,8 @@ Faz 1 tamamlandıktan sonra diğer AI'ın önerisiyle sıralama revize edildi:
 | **Faz 7** | Excel export (FR-11) | **TAMAMLANDI** |
 | **Faz 8** | Güvenlik: rate limit, session timeout, expired code | **TAMAMLANDI** |
 | **Faz 9** | Responsive UI cilası + Türkçe lokalizasyon | **TAMAMLANDI** |
-| **Faz 10** | Offline destek (FR-23) | Bekliyor |
-| **Faz 11** | Entegrasyon testi + final cleanup | Bekliyor |
+| **Faz 10** | Offline destek (FR-23) | **TAMAMLANDI** |
+| **Faz 11** | Entegrasyon testi + final cleanup | **TAMAMLANDI** |
 
 ---
 
@@ -911,6 +911,91 @@ Eklenen/düzenlenen stiller:
 - Admin/öğretmen/öğrenci temel sayfaları 200 döndü.
 - Login, 404 ve 429 sayfaları render edildi.
 - Türkçe karakterli template'ler Jinja render sırasında hata vermedi.
+
+---
+
+### 20. Faz 10 — Offline Destek (Tamamlandı)
+
+**Tarih:** 2026-04-26
+
+**Kapsam:** FR-23 — Öğrenci yoklama akışında çevrimdışı kayıt ve bağlantı gelince senkronizasyon.
+
+#### 20.1. Service Worker
+
+**Dosyalar:**
+- `sw.js` — Uygulama shell'i, CSS ve temel JS dosyaları cache'lenir.
+- `app.py` — `/sw.js` route'u eklendi; Service Worker root scope ile çalışır.
+- `templates/base.html` — Offline script tüm sayfalara eklendi.
+
+Service Worker davranışı:
+- GET isteklerinde network-first çalışır.
+- Network yoksa cache'e düşer.
+- POST isteklerine dokunmaz; yoklama POST senkronizasyonu IndexedDB katmanında yapılır.
+
+#### 20.2. IndexedDB Kuyruğu
+
+**Dosya:** `static/js/offline.js` — **YENİ**
+
+Eklenenler:
+- `pending_attendance` object store'u.
+- Öğrenci yoklama formu çevrimdışıyken submit edilirse FormData IndexedDB'ye kaydedilir.
+- Bağlantı geri geldiğinde kayıtlar aynı Flask endpoint'ine `fetch(..., credentials='same-origin')` ile gönderilir.
+- Başarılı veya istemci hatasıyla sonuçlanan denemeler kuyruktan silinir; login yönlendirmesi ve sunucu hatalarında tekrar denenir.
+- Sayfa üstünde çevrimdışı banner gösterilir.
+
+#### 20.3. Öğrenci Yoklama Formu
+
+**Dosya:** `templates/student/dashboard.html`
+
+- Yoklama formuna `data-offline-attendance="1"` eklendi.
+- Oturum kimliği hidden input olarak forma eklendi.
+- Mevcut server-side doğrulama korunur: senkronizasyon sırasında kod süresi dolmuşsa servis yine reddeder.
+
+---
+
+### 21. Faz 11 — Entegrasyon Testi + Final Cleanup (Tamamlandı)
+
+**Tarih:** 2026-04-26
+
+**Kapsam:** Kabul kriterleri — uçtan uca akışların tek komutla doğrulanması ve repo son temizliği.
+
+#### 21.1. Entegrasyon Kontrolü
+
+**Dosya:** `tests/integration_check.py` — **YENİ**
+
+Kontrol edilen akışlar:
+- Login sayfası, Service Worker ve offline JS asset'leri.
+- Öğrenci dashboard ve offline yoklama formu render'ı.
+- Öğrenci yoklama gönderimi.
+- Şüpheli kayıt oluşturma.
+- Öğretmen aktif oturum sayfasında şüpheli listeleme.
+- Öğretmen şüpheli onaylama.
+- Öğretmen Excel export.
+- Başka öğretmenin yetkisiz export denemesinin engellenmesi.
+- Admin istatistik sayfası.
+- Admin tüm ders Excel export.
+- Süresi dolmuş kodun reddedilmesi.
+
+Çalıştırma:
+
+```bash
+python3 tests/integration_check.py
+```
+
+#### 21.2. README Güncellemesi
+
+**Dosya:** `README.md`
+
+- Kurulum, seed, çalıştırma ve entegrasyon kontrol komutları eklendi.
+- Seed kullanıcıları belgelendi.
+
+#### 21.3. Testler
+
+**Geçen testler:**
+- `py_compile` başarılı.
+- `python3 tests/integration_check.py` başarılı.
+- Offline asset route'ları 200 döndü.
+- `.xlsx` export dosyaları `openpyxl` ile açıldı.
 
 ---
 

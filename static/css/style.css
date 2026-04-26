@@ -8,6 +8,15 @@ body {
     line-height: 1.6;
 }
 
+.offline-banner {
+    background: #856404;
+    color: #fff;
+    padding: 10px 16px;
+    text-align: center;
+    font-size: 0.92rem;
+    font-weight: 600;
+}
+
 a { color: #3498db; text-decoration: none; }
 a:hover { text-decoration: underline; }
 

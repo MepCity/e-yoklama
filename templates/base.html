@@ -10,6 +10,7 @@
     {% block head %}{% endblock %}
 </head>
 <body>
+    <div id="offlineBanner" class="offline-banner" hidden>Çevrimdışısınız. Yoklama denemeleri bağlantı gelince gönderilecek.</div>
     {% if session.get('user') %}
     {% include 'components/_nav.html' %}
     {% endif %}
@@ -20,6 +21,7 @@
     </main>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/offline.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

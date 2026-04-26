@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from flask import Flask, redirect, url_for, session, render_template, request, flash
+from flask import Flask, redirect, url_for, session, render_template, request, flash, send_from_directory
 from flask_socketio import SocketIO
 from config import config
 
@@ -47,6 +47,10 @@ def create_app(config_name='development'):
             elif user['role'] == 2:
                 return redirect(url_for('student.dashboard'))
         return redirect(url_for('auth.login_page'))
+
+    @app.route('/sw.js')
+    def service_worker():
+        return send_from_directory(app.root_path, 'sw.js', mimetype='application/javascript')
 
     @app.before_request
     def enforce_session_timeout():

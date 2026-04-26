@@ -15,8 +15,9 @@
             {% if active.id in checked_in_sessions %}
             <p class="status-verified">Bu yoklama oturumuna katıldınız.</p>
             {% else %}
-            <form method="POST" action="{{ url_for('student.check_in', session_id=active.id) }}" class="check-in-form">
+            <form method="POST" action="{{ url_for('student.check_in', session_id=active.id) }}" class="check-in-form" data-offline-attendance="1">
                 <label for="code-{{ active.id }}">Yoklama Kodu</label>
+                <input type="hidden" name="session_id" value="{{ active.id }}">
                 <input type="hidden" name="latitude" class="gps-latitude">
                 <input type="hidden" name="longitude" class="gps-longitude">
                 <div class="form-inline">
