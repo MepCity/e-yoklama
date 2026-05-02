@@ -95,7 +95,15 @@ def run():
         login(client, 'student')
         dashboard = client.get('/student/dashboard')
         assert dashboard.status_code == 200
-        assert 'data-offline-attendance' in dashboard.get_data(as_text=True)
+        dashboard_html = dashboard.get_data(as_text=True)
+        assert 'data-offline-attendance' in dashboard_html
+        assert 'BarcodeDetector' in dashboard_html
+        assert 'qrScanner' in dashboard_html
+
+        student_schedule = client.get('/student/schedule')
+        assert student_schedule.status_code == 200
+        assert 'Ders Programım' in student_schedule.get_data(as_text=True)
+        assert 'Ders Programı' in dashboard_html
 
         blocked_check_in = client.post(
             f'/student/session/{att_session.id}/check-in',
@@ -121,7 +129,10 @@ def run():
         login(client, 'teacher')
         teacher_page = client.get(f'/teacher/session/{att_session.id}')
         assert teacher_page.status_code == 200
-        assert 'Şüpheli Yoklamalar' in teacher_page.get_data(as_text=True)
+        teacher_page_html = teacher_page.get_data(as_text=True)
+        assert 'Şüpheli Yoklamalar' in teacher_page_html
+        assert 'data:image/png;base64,' in teacher_page_html
+        assert f'id="currentCode">{att_session.current_code}</div>' in teacher_page_html
 
         review = client.post(
             f'/teacher/records/{record.id}/resolve',

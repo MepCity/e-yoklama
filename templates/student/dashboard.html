@@ -57,6 +57,10 @@
                         </div>
                         <div class="method-qr">
                             <button id="scanQRBtn" class="btn btn-info">📷 QR Kod Okut</button>
+                            <div id="qrScanner" class="qr-scanner hidden">
+                                <video id="qrVideo" playsinline></video>
+                                <button id="stopScanBtn" class="btn btn-secondary">Taramayı Durdur</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -172,6 +176,17 @@
     margin-bottom: 10px;
 }
 
+.qr-scanner {
+    margin-top: 10px;
+}
+
+.qr-scanner video {
+    width: 100%;
+    max-width: 300px;
+    border-radius: 8px;
+    background: #111827;
+}
+
 @media (max-width: 768px) {
     .verification-methods {
         grid-template-columns: 1fr;
@@ -193,9 +208,11 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentSessionId = null;
     let countdownTimer = null;
     let verifiedCoords = null;  // GPS başarılıysa koordinatları burada sakla
+    let qrStream = null;
+    let qrScanTimer = null;
 
-    closeBtn.onclick = () => { modal.style.display = 'none'; clearTimer(); };
-    window.onclick = (e) => { if (e.target === modal) { modal.style.display = 'none'; clearTimer(); } };
+    closeBtn.onclick = () => { modal.style.display = 'none'; clearTimer(); stopQRScanner(); };
+    window.onclick = (e) => { if (e.target === modal) { modal.style.display = 'none'; clearTimer(); stopQRScanner(); } };
 
     function clearTimer() {
         if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
@@ -408,9 +425,69 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    document.getElementById('scanQRBtn').addEventListener('click', function () {
-        alert('QR tarama özelliği tarayıcı kamera izni gerektirir. Lütfen kodu manuel olarak girin.');
-    });
+    document.getElementById('scanQRBtn').addEventListener('click', startQRScanner);
+    document.getElementById('stopScanBtn').addEventListener('click', stopQRScanner);
+
+    async function startQRScanner() {
+        if (!('BarcodeDetector' in window)) {
+            alert('Bu tarayıcı QR okumayı desteklemiyor. Lütfen kodu manuel olarak girin.');
+            return;
+        }
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('Kamera erişimi desteklenmiyor. Lütfen kodu manuel olarak girin.');
+            return;
+        }
+
+        const scanner = document.getElementById('qrScanner');
+        const video = document.getElementById('qrVideo');
+        scanner.classList.remove('hidden');
+
+        try {
+            qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            video.srcObject = qrStream;
+            await video.play();
+            const detector = new BarcodeDetector({ formats: ['qr_code'] });
+
+            qrScanTimer = setInterval(async () => {
+                if (!video.videoWidth) {
+                    return;
+                }
+                try {
+                    const codes = await detector.detect(video);
+                    if (codes.length && codes[0].rawValue) {
+                        document.getElementById('codeInput').value = codes[0].rawValue.trim().toUpperCase();
+                        stopQRScanner();
+                    }
+                } catch (_) {
+                    stopQRScanner();
+                    alert('QR okunamadı. Lütfen kodu manuel olarak girin.');
+                }
+            }, 500);
+        } catch (err) {
+            stopQRScanner();
+            alert('Kamera açılamadı. Lütfen kodu manuel olarak girin.');
+        }
+    }
+
+    function stopQRScanner() {
+        if (qrScanTimer) {
+            clearInterval(qrScanTimer);
+            qrScanTimer = null;
+        }
+        if (qrStream) {
+            qrStream.getTracks().forEach(track => track.stop());
+            qrStream = null;
+        }
+        const scanner = document.getElementById('qrScanner');
+        const video = document.getElementById('qrVideo');
+        if (video) {
+            video.pause();
+            video.srcObject = null;
+        }
+        if (scanner) {
+            scanner.classList.add('hidden');
+        }
+    }
 });
 </script>
 {% endblock %}

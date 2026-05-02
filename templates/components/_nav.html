@@ -18,6 +18,7 @@
             <a href="{{ url_for('teacher.statistics') }}" class="nav-link">İstatistikler</a>
         {% elif role == 2 %}
             <a href="{{ url_for('student.dashboard') }}" class="nav-link">Panel</a>
+            <a href="{{ url_for('student.schedule') }}" class="nav-link">Ders Programı</a>
             <a href="{{ url_for('student.statistics') }}" class="nav-link">İstatistikler</a>
             <a href="{{ url_for('student.verifications') }}" class="nav-link">Doğrulamalar</a>
         {% endif %}

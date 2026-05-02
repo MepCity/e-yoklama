@@ -1520,7 +1520,62 @@ Cihaz eşleşmesi olmayan öğrenci dashboard'dan "Yoklamaya Gir" dediğinde mod
 - `templates/student/dashboard.html`
   - "Yoklamaya Gir" tıklanınca modal açmadan önce `/student/api/check-device-pairing` çağrılır.
   - Cihaz eşleşmesi zorunlu ve eksikse kullanıcı hemen bilgilendirilir ve `Doğrulamalar` sayfasına yönlendirilir.
-  - Böylece gereksiz GPS/network denemeleri yapılmaz.
+- Böylece gereksiz GPS/network denemeleri yapılmaz.
+
+---
+
+### 27. QR Render Test Kapsamı
+
+**Tarih:** 2026-05-02
+
+#### 27.1. Tespit Edilen Eksik
+
+Öğretmen aktif yoklama ekranında QR üretimi ve render akışı vardı; ancak entegrasyon testinde QR görselinin sayfada gerçekten üretildiği doğrulanmıyordu.
+
+#### 27.2. Yapılan Düzeltme
+
+- `tests/integration_check.py`
+  - Öğretmen aktif oturum sayfasında `data:image/png;base64,` içeren QR görseli render ediliyor mu kontrol edildi.
+  - Aynı sayfada aktif yoklama kodunun `currentCode` alanında görüntülendiği doğrulandı.
+  - Şüpheli yoklama bölümü kontrolü korunarak QR testi aynı öğretmen aktif oturum akışına eklendi.
+
+#### 27.3. Doğrulama
+
+- `python3 tests/integration_check.py` başarılı olmalıdır.
+
+---
+
+### 28. Öğrenci Ders Programı Linki ve Kamera ile QR Okuma
+
+**Tarih:** 2026-05-02
+
+#### 28.1. Tespit Edilen Eksikler
+
+- Öğrenci için `/student/schedule` route'u ve sayfası vardı; ancak öğrenci nav menüsünde "Ders Programı" linki görünmüyordu.
+- Öğrenci yoklama ekranlarında QR okuma butonu vardı; fakat gerçek kamera/QR okuma yerine sadece uyarı gösteriyordu.
+
+#### 28.2. Yapılan Düzeltmeler
+
+- `templates/components/_nav.html`
+  - Öğrenci menüsüne `Ders Programı` linki eklendi.
+
+- `templates/student/dashboard.html`
+  - Yoklama modalına QR scanner video alanı eklendi.
+  - `BarcodeDetector` destekleyen tarayıcılarda kamera açılıp QR kod okunur.
+  - QR değeri okunduğunda kod input'una otomatik yazılır.
+  - Tarayıcı/kamera desteği yoksa manuel girişe düşülür.
+
+- `templates/student/verifications.html`
+  - Aktif yoklama akışındaki QR butonu gerçek kamera tarama desteğine bağlandı.
+  - Modal kapanırken veya tarama durdurulurken kamera stream'i temizlenir.
+
+- `tests/integration_check.py`
+  - Öğrenci dashboard'unda QR scanner markup ve `BarcodeDetector` entegrasyonu kontrol edildi.
+  - Öğrenci ders programı sayfasının erişilebilir olduğu doğrulandı.
+
+#### 28.3. Not
+
+Kamera ile QR okuma tarayıcı desteğine bağlıdır. `BarcodeDetector` desteklenmeyen tarayıcılarda kullanıcı manuel kod girişine yönlendirilir.
 
 ---
 
