@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block title %}Öğrenci Onayları — E-Yoklama{% endblock %}
+{% block content %}
+<h1>Öğrenci Onayları</h1>
+
+<div class="card">
+    <h3>Admin Onayı Bekleyen Öğrenciler</h3>
+    {% if pending_students %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Öğrenci No</th>
+                        <th>Öğrenci Adı</th>
+                        <th>Ders</th>
+                        <th>Eklenme Tarihi</th>
+                        <th>Durum</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cs in pending_students %}
+                    <tr>
+                        <td>{{ cs.student.student_number or '-' }}</td>
+                        <td>{{ cs.student.username }}</td>
+                        <td>{{ cs.course.name }} ({{ cs.course.code or '-' }})</td>
+                        <td>{{ cs.enrolled_at }}</td>
+                        <td><span class="status-suspicious">Admin Onayı Bekliyor</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="text-info">
+            <strong>Bilgi:</strong> Bu öğrenciler derse eklendi ve yoklamalara katılabilirler. 
+            Ancak öğrenci istatistikleri admin onayı verildikten sonra görüntülenebilir.
+        </p>
+    {% else %}
+        <p>Admin onayı bekleyen öğrenci bulunmuyor.</p>
+    {% endif %}
+</div>
+
+{% if approved_students %}
+<div class="card">
+    <h3>Admin Onayı Alan Öğrenciler</h3>
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Öğrenci No</th>
+                    <th>Öğrenci Adı</th>
+                    <th>Ders</th>
+                    <th>Eklenme Tarihi</th>
+                    <th>Durum</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cs in approved_students %}
+                <tr>
+                    <td>{{ cs.student.student_number or '-' }}</td>
+                    <td>{{ cs.student.username }}</td>
+                    <td>{{ cs.course.name }} ({{ cs.course.code or '-' }})</td>
+                    <td>{{ cs.enrolled_at }}</td>
+                    <td><span class="status-approved">Onaylandı</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

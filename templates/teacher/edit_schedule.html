@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block title %}Ders Programı Düzenle — E-Yoklama{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Ders Programı Düzenle</h1>
+    <div class="course-info">
+        <p><strong>Ders:</strong> {{ schedule.course.name }}</p>
+        <p><strong>Ders Kodu:</strong> {{ schedule.course.code or '-' }}</p>
+    </div>
+    <div class="actions-bar">
+        <a href="{{ url_for('teacher.course_details', course_id=schedule.course_id) }}" class="btn btn-secondary">← Ders Detaylarına Dön</a>
+    </div>
+</div>
+
+<div class="card">
+    <h3>Program Bilgileri</h3>
+    <form method="POST">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="day_of_week">Gün</label>
+                <select name="day_of_week" id="day_of_week" required>
+                    <option value="">Seçiniz</option>
+                    <option value="1" {% if schedule.day_of_week == 1 %}selected{% endif %}>Pazartesi</option>
+                    <option value="2" {% if schedule.day_of_week == 2 %}selected{% endif %}>Salı</option>
+                    <option value="3" {% if schedule.day_of_week == 3 %}selected{% endif %}>Çarşamba</option>
+                    <option value="4" {% if schedule.day_of_week == 4 %}selected{% endif %}>Perşembe</option>
+                    <option value="5" {% if schedule.day_of_week == 5 %}selected{% endif %}>Cuma</option>
+                    <option value="6" {% if schedule.day_of_week == 6 %}selected{% endif %}>Cumartesi</option>
+                    <option value="7" {% if schedule.day_of_week == 7 %}selected{% endif %}>Pazar</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="start_time">Başlangıç Saati</label>
+                <input type="time" name="start_time" id="start_time" value="{{ schedule.start_time }}" required min="08:00" max="22:00">
+            </div>
+            <div class="form-group">
+                <label for="end_time">Bitiş Saati</label>
+                <input type="time" name="end_time" id="end_time" value="{{ schedule.end_time }}" required min="08:00" max="22:00">
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="room">Derslik</label>
+                <input type="text" name="room" id="room" value="{{ schedule.room or '' }}" placeholder="Derslik bilgisi">
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Kaydet</button>
+            <a href="{{ url_for('teacher.course_details', course_id=schedule.course_id) }}" class="btn btn-secondary">İptal</a>
+        </div>
+    </form>
+</div>
+
+<style>
+.course-info {
+    background: rgba(52, 152, 219, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #3498db;
+}
+
+.course-info p {
+    margin: 5px 0;
+    color: #2c3e50;
+}
+
+.page-header {
+    margin-bottom: 20px;
+}
+
+.page-header h1 {
+    color: #2c3e50;
+    margin-bottom: 10px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+</style>
+{% endblock %}

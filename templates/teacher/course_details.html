@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block title %}{{ course.name }} — Ders Detayları — E-Yoklama{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>{{ course.name }}</h1>
+    <div class="course-info">
+        <p><strong>Ders Kodu:</strong> {{ course.code or '-' }}</p>
+        <p><strong>Bölüm:</strong> {{ course.department or '-' }}</p>
+        <p><strong>Sınıf:</strong> {{ course.class_name or '-' }}</p>
+        {% if course.day_of_week and course.start_time and course.end_time %}
+        <p><strong>Zaman:</strong> 
+            {% set days = ['', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'] %}
+            {% set start_time = course.start_time|string if course.start_time else '' %}
+            {% set end_time = course.end_time|string if course.end_time else '' %}
+            {% if ':' not in start_time %}
+                {% set start_time = (start_time|float|int|string + ':00') %}
+            {% endif %}
+            {% if ':' not in end_time %}
+                {% set end_time = (end_time|float|int|string + ':00') %}
+            {% endif %}
+            {{ days[course.day_of_week] }} {{ start_time }}-{{ end_time }}
+        </p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="actions-bar">
+    <a href="{{ url_for('teacher.dashboard') }}" class="btn btn-secondary">← Derslerime Dön</a>
+    <a href="{{ url_for('teacher.attendance_start') }}?course_id={{ course.id }}" class="btn btn-success">Yoklama Başlat</a>
+    <a href="{{ url_for('teacher.statistics', course_id=course.id) }}" class="btn btn-info">İstatistikler</a>
+</div>
+
+<div class="card">
+    <h3>Dersin Öğrencileri</h3>
+    {% if students %}
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Öğrenci No</th>
+                    <th>Ad Soyad</th>
+                    <th>Bölüm</th>
+                    <th>Durum</th>
+                    <th>İşlemler</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                <tr>
+                    <td>{{ student.student_number or '-' }}</td>
+                    <td>{{ student.username }}</td>
+                    <td>{{ student.department or '-' }}</td>
+                    <td>
+                        {% if student.is_active == 1 %}
+                            <span class="status-active">Aktif</span>
+                        {% else %}
+                            <span class="status-inactive">Pasif</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('teacher.student_attendance', course_id=course.id, student_id=student.id) }}" class="btn btn-small">Yoklama Geçmişi</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>Bu derse henüz öğrenci eklenmemiş.</p>
+    {% endif %}
+</div>
+
+
+<style>
+.course-info {
+    background: rgba(52, 152, 219, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #3498db;
+}
+
+.course-info p {
+    margin: 5px 0;
+    color: #2c3e50;
+}
+
+.page-header {
+    margin-bottom: 20px;
+}
+
+.page-header h1 {
+    color: #2c3e50;
+    margin-bottom: 10px;
+}
+
+.status-active { color: #27ae60; font-weight: 600; }
+.status-inactive { color: #e74c3c; font-weight: 600; }
+</style>
+{% endblock %}

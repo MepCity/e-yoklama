@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% block title %}Öğrenci Onayları — E-Yoklama{% endblock %}
+{% block content %}
+<h1>Öğrenci Onayları</h1>
+
+<div class="card">
+    <h3>Onay Bekleyen Öğrenciler</h3>
+    {% if pending_students %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Öğrenci No</th>
+                        <th>Öğrenci Adı</th>
+                        <th>Bölüm</th>
+                        <th>Sınıf</th>
+                        <th>Ders</th>
+                        <th>Öğretmen</th>
+                        <th>Ekleyen</th>
+                        <th>İşlemler</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cs in pending_students %}
+                    <tr>
+                        <td>{{ cs.student.student_number or '-' }}</td>
+                        <td>{{ cs.student.username }}</td>
+                        <td>{{ cs.student.department or '-' }}</td>
+                        <td>{{ cs.student.class_name or '-' }}</td>
+                        <td>{{ cs.course.name }} ({{ cs.course.code or '-' }})</td>
+                        <td>{{ cs.course.teacher.username }}</td>
+                        <td>
+                            {% if cs.course.teacher.branch == cs.student.department %}
+                                <span class="status-approved">Uygun</span>
+                            {% else %}
+                                <span class="status-suspicious">Bölüm Uyumsuz</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <form method="POST" action="{{ url_for('admin.approve_student', cs_id=cs.id) }}" style="display: inline;">
+                                <button type="submit" name="action" value="approve" class="btn btn-success btn-small" 
+                                        onclick="return confirm('{{ cs.student.username }} öğrencisinin ders kaydını onaylamak istediğinize emin misiniz?')">
+                                    Onayla
+                                </button>
+                                <button type="submit" name="action" value="reject" class="btn btn-danger btn-small"
+                                        onclick="return confirm('{{ cs.student.username }} öğrencisinin ders kaydını reddetmek istediğinize emin misiniz?')">
+                                    Reddet
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="text-info">
+            <strong>Bilgi:</strong> Öğrenciler onay beklerken yoklamalara katılabilirler. 
+            Onay verdikten sonra öğrenci istatistikleri görüntülenebilir.
+        </p>
+    {% else %}
+        <p>Onay bekleyen öğrenci bulunmuyor.</p>
+    {% endif %}
+</div>
+
+{% if approved_students %}
+<div class="card">
+    <h3>Onaylanan Öğrenciler</h3>
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Öğrenci No</th>
+                    <th>Öğrenci Adı</th>
+                    <th>Bölüm</th>
+                    <th>Sınıf</th>
+                    <th>Ders</th>
+                    <th>Öğretmen</th>
+                    <th>Durum</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cs in approved_students %}
+                <tr>
+                    <td>{{ cs.student.student_number or '-' }}</td>
+                    <td>{{ cs.student.username }}</td>
+                    <td>{{ cs.student.department or '-' }}</td>
+                    <td>{{ cs.student.class_name or '-' }}</td>
+                    <td>{{ cs.course.name }} ({{ cs.course.code or '-' }})</td>
+                    <td>{{ cs.course.teacher.username }}</td>
+                    <td><span class="status-approved">Onaylandı</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if rejected_students %}
+<div class="card">
+    <h3>Reddedilen Öğrenciler</h3>
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Öğrenci No</th>
+                    <th>Öğrenci Adı</th>
+                    <th>Bölüm</th>
+                    <th>Sınıf</th>
+                    <th>Ders</th>
+                    <th>Öğretmen</th>
+                    <th>Durum</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cs in rejected_students %}
+                <tr>
+                    <td>{{ cs.student.student_number or '-' }}</td>
+                    <td>{{ cs.student.username }}</td>
+                    <td>{{ cs.student.department or '-' }}</td>
+                    <td>{{ cs.student.class_name or '-' }}</td>
+                    <td>{{ cs.course.name }} ({{ cs.course.code or '-' }})</td>
+                    <td>{{ cs.course.teacher.username }}</td>
+                    <td><span class="status-rejected">Reddedildi</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

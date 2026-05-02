@@ -1,7 +1,32 @@
 {% extends 'base.html' %}
 {% block title %}İstatistiklerim — E-Yoklama{% endblock %}
 {% block content %}
-<h1>Ders İstatistikleri</h1>
+<div class="page-header">
+    <h1>Ders İstatistikleri</h1>
+    <div class="filter-section">
+        <form method="GET" action="{{ url_for('teacher.statistics') }}">
+            <div class="form-group">
+                <label for="course-select">Ders Seçin:</label>
+                <select name="course_id" id="course-select" onchange="this.form.submit()">
+                    <option value="">Tüm Dersler</option>
+                    {% for course in teacher_courses %}
+                    <option value="{{ course.id }}" {% if selected_course_id == course.id %}selected{% endif %}>
+                        {{ course.name }} ({{ course.code or '-' }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if selected_course %}
+<div class="selected-course-info">
+    <h2>{{ selected_course.name }} - İstatistikler</h2>
+    <p><strong>Ders Kodu:</strong> {{ selected_course.code or '-' }}</p>
+    <p><strong>Bölüm:</strong> {{ selected_course.department or '-' }}</p>
+</div>
+{% endif %}
 
 {% if course_stats %}
 <div class="stats-grid">
@@ -15,6 +40,51 @@
     </div>
     {% endfor %}
 </div>
+{% elif selected_course %}
+<div class="no-stats">
+    <p>Bu ders için henüz istatistik bulunmuyor.</p>
+</div>
+{% endif %}
+
+{% if selected_course and student_absences %}
+<h2>Öğrenci Devamsızlık Tablosu</h2>
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>Öğrenci No</th>
+                <th>Ad Soyad</th>
+                <th>Toplam Oturum</th>
+                <th>Devamsızlık</th>
+                <th>Katılım Oranı</th>
+                <th>Durum</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in student_absences %}
+            <tr>
+                <td>{{ item.student.student_number or '-' }}</td>
+                <td>{{ item.student.username }}</td>
+                <td>{{ item.total_sessions }}</td>
+                <td>{{ item.absence_count }}</td>
+                <td>%{{ item.attendance_rate }}</td>
+                <td>
+                    {% if item.absence_count == 0 %}
+                        <span class="status-excellent">Mükemmel</span>
+                    {% elif item.absence_count <= 2 %}
+                        <span class="status-good">İyi</span>
+                    {% elif item.absence_count <= 4 %}
+                        <span class="status-warning">Tehlikede</span>
+                    {% else %}
+                        <span class="status-danger">Riskli</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
 
 <h2>Detaylı Tablo</h2>
 <div class="table-responsive">
@@ -58,17 +128,18 @@
     <canvas id="attendanceChart"></canvas>
 </div>
 {% endif %}
-
-{% else %}
-<p>Henüz yoklama verisi bulunmuyor.</p>
-{% endif %}
 {% endblock %}
 
 {% block scripts %}
 {% if course_stats %}
 <script>
 const ctx = document.getElementById('attendanceChart').getContext('2d');
-const chartData = {{ chart_data|tojson }};
+// Chart verisi geçici olarak devre dışı
+const chartData = {
+    labels: [],
+    present: [],
+    suspicious: []
+};
 new Chart(ctx, {
     type: 'bar',
     data: {

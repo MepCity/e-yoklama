@@ -14,7 +14,14 @@ class Course(Base):
     department = Column(String(100), nullable=True)
     class_name = Column(String(50), nullable=True)
     semester = Column(String(30), nullable=True)
+    building_id = Column(Integer, nullable=True)  # Bina ID
+    classroom_id = Column(Integer, nullable=True)  # Sınıf ID
+    day_of_week = Column(Integer, nullable=True)  # 1-7 (Pazartesi-Pazar)
+    start_time = Column(String(5), nullable=True)  # HH:MM format
+    end_time = Column(String(5), nullable=True)  # HH:MM format
     is_active = Column(Integer, nullable=False, default=1)
+    teacher_approval = Column(Integer, nullable=False, default=0)  # 0=bekliyor, 1=onaylı, 2=redded
+    status = Column(Integer, nullable=False, default=0)  # 0=onay bekliyor, 1=aktif, 2=pasif
     created_at = Column(Text, nullable=False, default=utcnow_str)
 
     # Relationship'ler
@@ -30,6 +37,7 @@ class CourseStudent(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     course_id = Column(Integer, ForeignKey('courses.id', ondelete='CASCADE'), nullable=False, index=True)
     student_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    admin_approval = Column(Integer, nullable=False, default=0)  # 0=bekliyor, 1=onaylı, 2=redded
     enrolled_at = Column(Text, nullable=False, default=utcnow_str)
 
     __table_args__ = (

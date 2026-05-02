@@ -24,13 +24,26 @@
     <div class="qr-code" id="currentCode">{{ att_session.current_code }}</div>
     <p class="qr-hint">Geçerlilik: <span id="codeExpiresAt">{{ att_session.code_expires_at }}</span></p>
     {% if qr_base64 %}
-    <div>
+    <div id="qrContainer">
         <img id="qrImage" class="qr-image" src="data:image/png;base64,{{ qr_base64 }}" alt="QR Kod">
     </div>
     {% endif %}
-    <p class="qr-hint">Kod her {{ att_session.code_refresh_seconds }} saniyede yenilenir. Öğrenciler bu kodu girerek yoklamaya katılabilir.</p>
     <p class="qr-hint">Kalan süre: <span id="codeCountdown">-</span></p>
 </div>
+
+{% if att_session.status == 'active' %}
+<div class="qr-settings-section">
+    <h3>QR Ayarları</h3>
+    <form method="POST" action="{{ url_for('teacher.update_refresh_rate', session_id=att_session.id) }}" class="inline-form">
+        <div class="setting-group">
+            <label>QR Yenileme Süresi (saniye)</label>
+            <input type="number" name="refresh_seconds" value="{{ att_session.code_refresh_seconds }}" min="1" max="60" class="form-control">
+            <small>1-60 saniye arası</small>
+        </div>
+        <button type="submit" class="btn btn-primary">Güncelle</button>
+    </form>
+</div>
+{% endif %}
 
 <div class="action-center">
     <form method="POST" action="{{ url_for('teacher.end_session', session_id=att_session.id) }}" class="inline-form">
@@ -168,12 +181,35 @@
         document.getElementById('currentCode').textContent = payload.code;
         document.getElementById('codeExpiresAt').textContent = payload.expires_at;
         var qrImage = document.getElementById('qrImage');
-        if (qrImage && payload.qr_base64) {
+        var qrContainer = document.getElementById('qrContainer');
+        if (qrImage && payload.qr_base64 && qrContainer) {
             qrImage.src = 'data:image/png;base64,' + payload.qr_base64;
+            qrContainer.style.display = 'block';
         }
         expiresAt = new Date(payload.expires_at);
         refreshSeconds = payload.refresh_seconds || refreshSeconds;
         updateCountdown();
+    });
+
+    socket.on('session_ended', function (payload) {
+        if (!payload || payload.session_id !== sessionId) {
+            return;
+        }
+        // QR kodunu gizle
+        var qrContainer = document.getElementById('qrContainer');
+        var qrImage = document.getElementById('qrImage');
+        if (qrContainer) {
+            qrContainer.style.display = 'none';
+        }
+        // Geri sayımı durdur
+        var countdown = document.getElementById('codeCountdown');
+        if (countdown) {
+            countdown.textContent = 'Oturum sonlandırıldı';
+        }
+        // Sayfayı yenile
+        setTimeout(function() {
+            window.location.reload();
+        }, 2000);
     });
 
     socket.on('attendance_error', function (payload) {

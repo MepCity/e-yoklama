@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% block title %}{{ student.username }} - Yoklama Geçmişi — E-Yoklama{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Öğrenci Yoklama Geçmişi</h1>
+    <div class="student-info">
+        <h2>{{ student.username }}</h2>
+        <p><strong>Öğrenci No:</strong> {{ student.student_number or '-' }}</p>
+        <p><strong>Bölüm:</strong> {{ student.department or '-' }}</p>
+        <p><strong>Ders:</strong> {{ course.name }} ({{ course.code or '-' }})</p>
+    </div>
+    <div class="actions-bar">
+        <a href="{{ url_for('teacher.course_details', course_id=course.id) }}" class="btn btn-secondary">← Ders Detaylarına Dön</a>
+    </div>
+</div>
+
+<div class="card">
+    <h3>Yoklama Kayıtları</h3>
+    {% if attendance_records %}
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Tarih</th>
+                    <th>Oturum Kodu</th>
+                    <th>Durum</th>
+                    <th>Giriş Zamanı</th>
+                    <th>IP Adresi</th>
+                    <th>Konum</th>
+                    <th>Doğrulama</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in attendance_records %}
+                <tr class="{{ 'status-suspicious' if record.status == 'suspicious' }}">
+                    <td>{{ record.session.started_at[:10] if record.session.started_at else '-' }}</td>
+                    <td>{{ record.session.session_code }}</td>
+                    <td>
+                        {% if record.status == 'present' %}
+                            <span class="status-present">Var</span>
+                        {% elif record.status == 'absent' %}
+                            <span class="status-absent">Yok</span>
+                        {% elif record.status == 'suspicious' %}
+                            <span class="status-suspicious">Şüpheli</span>
+                        {% else %}
+                            <span class="status-manual">Manuel</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ record.created_at[:19] if record.created_at else '-' }}</td>
+                    <td>{{ record.ip_address or '-' }}</td>
+                    <td>
+                        {% if record.latitude and record.longitude %}
+                            {{ record.latitude }}, {{ record.longitude }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if record.verification_status == 'verified' %}
+                            <span class="verification-verified">Doğrulanmış</span>
+                        {% elif record.verification_status == 'suspicious' %}
+                            <span class="verification-suspicious">Şüpheli</span>
+                        {% else %}
+                            <span class="verification-none">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>Bu öğrencinin derse ait yoklama kaydı bulunmuyor.</p>
+    {% endif %}
+</div>
+
+<style>
+.student-info {
+    background: rgba(52, 152, 219, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #3498db;
+}
+
+.student-info h2 {
+    margin-top: 0;
+    color: #2c3e50;
+}
+
+.student-info p {
+    margin: 5px 0;
+    color: #2c3e50;
+}
+
+.status-present { color: #27ae60; font-weight: 600; }
+.status-absent { color: #e74c3c; font-weight: 600; }
+.status-suspicious { color: #f39c12; font-weight: 600; }
+.status-manual { color: #3498db; font-weight: 600; }
+
+.verification-verified { color: #27ae60; font-weight: 600; }
+.verification-suspicious { color: #f39c12; font-weight: 600; }
+.verification-none { color: #95a5a6; }
+
+.status-suspicious {
+    background-color: rgba(243, 156, 18, 0.05);
+}
+
+.page-header {
+    margin-bottom: 20px;
+}
+
+.page-header h1 {
+    color: #2c3e50;
+    margin-bottom: 10px;
+}
+</style>
+{% endblock %}
