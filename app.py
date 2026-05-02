@@ -10,6 +10,8 @@ socketio = SocketIO(manage_session=False)
 def create_app(config_name='development'):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+    if not app.config.get('SECRET_KEY'):
+        raise RuntimeError('SECRET_KEY ortam değişkeni production için zorunludur.')
 
     # Rate limiting
     from utils.rate_limit import limiter

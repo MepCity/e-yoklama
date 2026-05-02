@@ -1,3 +1,4 @@
+import hashlib
 from flask import Blueprint, render_template, session, redirect, url_for, request, flash, current_app, jsonify
 from utils.decorators import role_required
 from utils.rate_limit import limiter
@@ -9,7 +10,6 @@ from models.device_pairing import DevicePairing
 from models.location_verification import LocationVerification
 from models.user import User
 from services import attendance_service, statistics_service
-import uuid
 import random
 import string
 from datetime import datetime
@@ -125,15 +125,16 @@ def verifications():
 @student_bp.route('/api/get-mac-address')
 @role_required(2)
 def get_mac_address():
-    """MAC adresini al (basit implementasyon)"""
-    try:
-        # Gerçek uygulamada client-side JavaScript ile alınır
-        # Şimdiliğine rastgele bir MAC adresi döndürelim
-        import random
-        mac = ':'.join(['{:02x}'.format(random.randint(0, 255)) for _ in range(6)])
-        return mac
-    except Exception as e:
-        return 'Bilinmiyor', 500
+    """Tarayıcılar MAC adresini vermez; cihaz anahtarı client tarafında üretilir."""
+    return 'Tarayıcı cihaz anahtarı gerekli', 400
+
+
+def _derive_device_key(raw_device_id, user_agent):
+    raw = (raw_device_id or '').strip()
+    if len(raw) < 16 or len(raw) > 128:
+        return None
+    digest = hashlib.sha256(f'{raw}|{user_agent or ""}'.encode('utf-8')).hexdigest()
+    return f'DV:{digest[:14]}'
 
 
 @student_bp.route('/api/pair-device', methods=['POST'])
@@ -143,22 +144,21 @@ def pair_device():
     try:
         user_id = session['user']['id']
         user = db.query(User).filter_by(id=user_id).first()
+        data = request.get_json(silent=True) or {}
         
         if not user or not user.student_number:
             return jsonify({'success': False, 'message': 'Öğrenci numarası bulunamadı'}), 400
         
-        # MAC adresi al (şimdilik rastgele)
-        import random
-        mac_address = ':'.join(['{:02x}'.format(random.randint(0, 255)) for _ in range(6)])
+        device_key = _derive_device_key(data.get('device_id'), request.headers.get('User-Agent'))
+        if not device_key:
+            return jsonify({'success': False, 'message': 'Geçerli cihaz anahtarı alınamadı'}), 400
         
-        # MAC adresinin başka bir kullanıcı tarafından kullanılıp kullanılmadığını kontrol et
-        existing_mac_pairing = DevicePairing.get_by_mac_address(mac_address, db)
+        existing_mac_pairing = DevicePairing.get_by_mac_address(device_key, db)
         if existing_mac_pairing and existing_mac_pairing.user_id != user_id:
-            # MAC adresi başka bir kullanıcı tarafından kullanılıyor
             other_user = db.query(User).filter_by(id=existing_mac_pairing.user_id).first()
             return jsonify({
                 'success': False, 
-                'message': f'Bu MAC adresi zaten {other_user.username} kullanıcısı tarafından eşlenmiş. Her cihaz sadece bir kullanıcı hesabında kullanılabilir.'
+                'message': f'Bu cihaz zaten {other_user.username} kullanıcısı tarafından eşlenmiş. Her cihaz sadece bir kullanıcı hesabında kullanılabilir.'
             }), 400
         
         # Mevcut eşlemeyi kontrol et
@@ -171,7 +171,7 @@ def pair_device():
             existing_pairing.is_active = False
         
         # Yeni eşleme oluştur
-        new_pairing = DevicePairing(user_id, mac_address, user.student_number)
+        new_pairing = DevicePairing(user_id, device_key, user.student_number)
         db.add(new_pairing)
         db.commit()
         
@@ -217,36 +217,24 @@ def verify_network():
     """Ağ doğrula"""
     try:
         user_id = session['user']['id']
-        
-        # Gerçek ağ bilgisini al
-        data = request.get_json() if request.is_json else {}
-        network_info = data.get('network_info', request.headers.get('User-Agent', ''))
-        
-        # Eduroam kontrolü - daha gerçekçi kontrol
-        is_eduroam = False
-        
-        # Client'dan gelen SSID bilgisi
-        if 'ssid' in data:
-            is_eduroam = 'eduroam' in data['ssid'].lower()
-        else:
-            # Header'dan kontrol (daha zayıf yöntem)
-            is_eduroam = 'eduroam' in network_info.lower()
-        
-        # Yeni konum doğrulaması oluştur
+        remote_addr = request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip()
+        allowed_prefix = current_app.config.get('ALLOWED_IP_PREFIX')
+        trusted_network = (
+            remote_addr in ('127.0.0.1', '::1')
+            or (allowed_prefix and remote_addr.startswith(allowed_prefix))
+        )
+
         verification = LocationVerification(user_id, 'network')
-        verification.verify_network(network_info)
-        
-        # Manuel olarak doğrulama durumunu ayarla
-        verification.verified = is_eduroam
-        verification.is_suspicious = not is_eduroam
+        verification.verify_network(remote_addr, allowed_prefix=allowed_prefix)
         
         db.add(verification)
         db.commit()
         
         return jsonify({
             'success': True,
-            'is_eduroam': is_eduroam,
-            'network_info': network_info
+            'is_eduroam': trusted_network,
+            'is_trusted_network': trusted_network,
+            'network_info': remote_addr
         })
         
     except Exception as e:

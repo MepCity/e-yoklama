@@ -34,31 +34,31 @@
                 {% for record in attendance_records %}
                 <tr class="{{ 'status-suspicious' if record.status == 'suspicious' }}">
                     <td>{{ record.session.started_at[:10] if record.session.started_at else '-' }}</td>
-                    <td>{{ record.session.session_code }}</td>
+                    <td>{{ record.submitted_code or '-' }}</td>
                     <td>
-                        {% if record.status == 'present' %}
+                        {% if record.status in ['verified', 'approved', 'manual'] %}
                             <span class="status-present">Var</span>
-                        {% elif record.status == 'absent' %}
-                            <span class="status-absent">Yok</span>
+                        {% elif record.status == 'rejected' %}
+                            <span class="status-absent">Reddedildi</span>
                         {% elif record.status == 'suspicious' %}
                             <span class="status-suspicious">Şüpheli</span>
                         {% else %}
-                            <span class="status-manual">Manuel</span>
+                            <span class="status-manual">{{ record.status }}</span>
                         {% endif %}
                     </td>
-                    <td>{{ record.created_at[:19] if record.created_at else '-' }}</td>
+                    <td>{{ record.submitted_at[:19] if record.submitted_at else '-' }}</td>
                     <td>{{ record.ip_address or '-' }}</td>
                     <td>
-                        {% if record.latitude and record.longitude %}
-                            {{ record.latitude }}, {{ record.longitude }}
+                        {% if record.gps_distance_m is not none %}
+                            {{ '%.1f'|format(record.gps_distance_m) }} m
                         {% else %}
                             -
                         {% endif %}
                     </td>
                     <td>
-                        {% if record.verification_status == 'verified' %}
+                        {% if record.ip_match != 0 and record.gps_match != 0 %}
                             <span class="verification-verified">Doğrulanmış</span>
-                        {% elif record.verification_status == 'suspicious' %}
+                        {% elif record.status == 'suspicious' %}
                             <span class="verification-suspicious">Şüpheli</span>
                         {% else %}
                             <span class="verification-none">-</span>

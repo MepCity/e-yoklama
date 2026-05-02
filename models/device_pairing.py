@@ -9,7 +9,7 @@ class DevicePairing(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
-    mac_address = Column(String(17), nullable=False, unique=True)  # MAC adresi formatı: XX:XX:XX:XX:XX:XX
+    mac_address = Column(String(17), nullable=False, unique=True)  # Geriye uyumlu alan: tarayıcı cihaz anahtarı
     student_number = Column(String(20), nullable=False, index=True)
     
     # Eşleme zamanları
@@ -26,7 +26,7 @@ class DevicePairing(Base):
     
     def __init__(self, user_id, mac_address, student_number):
         self.user_id = user_id
-        self.mac_address = mac_address.upper()  # MAC adresini büyük harfe çevir
+        self.mac_address = mac_address.upper()
         self.student_number = student_number
         self.created_at = utcnow_str()
         self.last_paired_at = utcnow_str()
@@ -74,7 +74,7 @@ class DevicePairing(Base):
     
     @classmethod
     def get_by_mac_address(cls, mac_address, db_session):
-        """MAC adresine göre eşleme getir"""
+        """Cihaz anahtarına göre eşleme getir"""
         return db_session.query(cls).filter(
             cls.mac_address == mac_address.upper(),
             cls.is_active == True

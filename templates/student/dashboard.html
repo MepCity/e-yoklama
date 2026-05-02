@@ -15,7 +15,7 @@
             {% if active.id in checked_in_sessions %}
             <p class="status-verified">Bu yoklama oturumuna katıldınız.</p>
             {% else %}
-            <button type="button" class="btn btn-primary check-in-btn" data-session-id="{{ active.id }}" data-requires-pairing="true">🎯 Yoklamaya Gir</button>
+            <button type="button" class="btn btn-primary check-in-btn" data-session-id="{{ active.id }}" data-requires-pairing="true">Yoklamaya Gir</button>
                 <p class="qr-hint">Kod geçerlilik zamanı: {{ active.code_expires_at }}</p>
             {% endif %}
         </div>
@@ -26,7 +26,6 @@
 {% else %}
 <p>Henüz kayıtlı dersiniz bulunmuyor.</p>
 {% endif %}
-{% endblock %}
 
 <!-- Doğrulama Modal -->
 <div id="verificationModal" class="modal">
@@ -68,6 +67,12 @@
         </div>
     </div>
 </div>
+
+<form id="offlineAttendanceForm" method="POST" data-offline-attendance="1" hidden>
+    <input type="hidden" name="code" id="offlineCode">
+    <input type="hidden" name="override" id="offlineOverride">
+    <input type="hidden" name="override_reason" id="offlineOverrideReason">
+</form>
 
 <style>
 .modal {
@@ -181,6 +186,7 @@
     }
 }
 </style>
+{% endblock %}
 
 {% block scripts %}
 <script>
@@ -261,12 +267,11 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const res = await fetch('/student/api/verify-network', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ network_type: 'wifi' })
+                headers: { 'Content-Type': 'application/json' }
             });
             const result = await res.json();
 
-            if (result.is_eduroam) {
+            if (result.is_trusted_network) {
                 await startVerificationCode();
                 return;
             }
@@ -330,6 +335,19 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!code) { alert('Lütfen kodu girin.'); return; }
 
         const isOverride = document.getElementById('step2').dataset.override === '1';
+        const offlineForm = document.getElementById('offlineAttendanceForm');
+        offlineForm.action = `/student/session/${currentSessionId}/check-in`;
+        document.getElementById('offlineCode').value = code;
+        document.getElementById('offlineOverride').value = isOverride ? '1' : '';
+        document.getElementById('offlineOverrideReason').value = isOverride ? 'GPS/ağ doğrulaması kullanılamadı' : '';
+
+        if (!navigator.onLine) {
+            offlineForm.requestSubmit();
+            clearTimer();
+            modal.style.display = 'none';
+            return;
+        }
+
         const formData = new FormData();
         formData.append('code', code);
         if (isOverride) {

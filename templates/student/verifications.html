@@ -11,7 +11,7 @@
     <div class="verification-card">
         <div class="card-header">
             <h2>📱 Cihaz Eşleme</h2>
-            <p>Cihazınızı MAC adresi ile eşleştirerek güvenli giriş yapın.</p>
+            <p>Bu tarayıcıya ait cihaz anahtarı ile güvenli giriş yapın.</p>
         </div>
         <div class="card-body">
             {% if device_pairing %}
@@ -22,7 +22,7 @@
                     </div>
                     <p class="pairing-info">
                         <strong>Eşleme Tarihi:</strong> {{ device_pairing.created_at[:10] }}<br>
-                        <strong>MAC Adresi:</strong> {{ device_pairing.mac_address }}<br>
+                        <strong>Cihaz Anahtarı:</strong> {{ device_pairing.mac_address }}<br>
                         <strong>Son Eşleme:</strong> {{ device_pairing.last_paired_at[:10] if device_pairing.last_paired_at else '-' }}
                     </p>
                     {% if device_pairing.days_until_renewal > 0 %}
@@ -68,7 +68,7 @@
                         {% if location_verification.verification_type == 'gps' %}
                             GPS Konumu
                         {% elif location_verification.verification_type == 'network' %}
-                            Eduroam Ağı
+                            Güvenilir Kampüs Ağı
                         {% else %}
                             Manuel Doğrulama
                         {% endif %}
@@ -125,13 +125,13 @@
                         <!-- GPS başarısız olursa gösterilecek -->
                         <div id="gpsFailed" class="verification-option hidden">
                             <p>⚠️ Kampüs konumu doğrulanamadı.</p>
-                            <p>Eduroam ağı kontrol ediliyor...</p>
+                            <p>Kampüs ağı kontrol ediliyor...</p>
                             <div class="loading-spinner"></div>
                         </div>
                         
-                        <!-- Eduroam başarılı olursa -->
+                        <!-- Kampüs ağı başarılı olursa -->
                         <div id="networkSuccess" class="verification-option hidden">
-                            <p>✅ Eduroam ağı tespit edildi!</p>
+                            <p>✅ Güvenilir kampüs ağı tespit edildi!</p>
                             <button id="continueToQRBtn2" class="btn btn-success">Devam Et</button>
                         </div>
                         
@@ -183,10 +183,10 @@
         </div>
         <div class="modal-body">
             <div class="pairing-info">
-                <p>Cihazınızı eşleştirmek için MAC adresiniz kullanılacaktır.</p>
+                <p>Cihazınızı eşleştirmek için bu tarayıcıda saklanan cihaz anahtarı kullanılacaktır.</p>
                 <p><strong>Öğrenci Numarası:</strong> {{ current_user.student_number }}</p>
-                <p><strong>MAC Adresi:</strong> <span id="macAddress">Alınıyor...</span></p>
-                <p class="warning">⚠️ Eşleme完成后 1 ay boyunca yeniden eşleme yapamazsınız.</p>
+                <p><strong>Cihaz Anahtarı:</strong> <span id="deviceKey">Alınıyor...</span></p>
+                <p class="warning">Eşleme sonrası 1 ay boyunca yeniden eşleme yapamazsınız.</p>
             </div>
             <div class="pairing-actions">
                 <button id="confirmPairingBtn" class="btn btn-primary">Cihazımı Eşle</button>
@@ -449,7 +449,7 @@ window.onclick = function(event) {
 
 // Cihaz eşleme
 document.getElementById('pairDeviceBtn')?.addEventListener('click', function() {
-    getMacAddress();
+    showDeviceKey();
     pairingModal.style.display = 'block';
 });
 
@@ -471,15 +471,23 @@ document.getElementById('requestLocationBtn')?.addEventListener('click', functio
     requestLocationVerification();
 });
 
-// MAC adresi alma
-async function getMacAddress() {
-    try {
-        // MAC adresi alma (basit yöntem)
-        const macAddress = await fetch('/student/api/get-mac-address').then(res => res.text());
-        document.getElementById('macAddress').textContent = macAddress || 'Bilinmiyor';
-    } catch (error) {
-        document.getElementById('macAddress').textContent = 'Alınamadı';
+function getOrCreateDeviceId() {
+    const key = 'e_yoklama_device_id';
+    let deviceId = localStorage.getItem(key);
+    if (!deviceId) {
+        if (window.crypto && crypto.randomUUID) {
+            deviceId = crypto.randomUUID();
+        } else {
+            deviceId = String(Date.now()) + '-' + Math.random().toString(16).slice(2);
+        }
+        localStorage.setItem(key, deviceId);
     }
+    return deviceId;
+}
+
+function showDeviceKey() {
+    const deviceId = getOrCreateDeviceId();
+    document.getElementById('deviceKey').textContent = deviceId.slice(0, 8) + '...' + deviceId.slice(-6);
 }
 
 // Cihaz eşleme
@@ -489,7 +497,8 @@ async function pairDevice() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-            }
+            },
+            body: JSON.stringify({ device_id: getOrCreateDeviceId() })
         });
         
         const result = await response.json();
@@ -555,23 +564,16 @@ async function requestLocationVerification() {
 // Ağ doğrulama kontrolü
 async function checkNetworkVerification() {
     try {
-        // Ağ bilgisini al (basit SSID kontrolü)
-        const networkInfo = {
-            ssid: 'unknown', // Gerçek uygulamada WiFi API ile alınır
-            network_type: 'wifi'
-        };
-        
         const response = await fetch('/student/api/verify-network', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(networkInfo)
+            }
         });
         const result = await response.json();
         
-        if (result.is_eduroam) {
-            // Eduroam başarılı
+        if (result.is_trusted_network) {
+            // Kampüs ağı başarılı
             showStep(3);
             document.getElementById('networkSuccess').classList.remove('hidden');
         } else {

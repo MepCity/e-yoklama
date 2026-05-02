@@ -17,7 +17,7 @@ class LocationVerification(Base):
     
     # Doğrulama türü
     verification_type = Column(String(20), nullable=False, default='manual')  # 'gps', 'network', 'manual'
-    network_info = Column(Text, nullable=True)  # Ağ bilgisi (eduroam kontrolü için)
+    network_info = Column(Text, nullable=True)  # Sunucunun gördüğü istemci IP bilgisi
     
     # Zaman bilgileri
     verified_at = Column(Text, nullable=False, default=utcnow_str)
@@ -151,13 +151,16 @@ class LocationVerification(Base):
         except:
             return False
     
-    def verify_network(self, network_info):
-        """Ağ doğrulaması yap"""
+    def verify_network(self, network_info, allowed_prefix=None):
+        """Sunucunun gördüğü istemci IP bilgisine göre ağ doğrulaması yap."""
         self.verification_type = 'network'
         self.network_info = network_info
         
-        # Eduroam kontrolü
-        if 'eduroam' in network_info.lower():
+        trusted_network = (
+            network_info in ('127.0.0.1', '::1')
+            or bool(allowed_prefix and network_info and network_info.startswith(allowed_prefix))
+        )
+        if trusted_network:
             self.verified = True
             self.is_suspicious = False
         else:

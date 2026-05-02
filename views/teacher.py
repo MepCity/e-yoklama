@@ -11,7 +11,7 @@ from services.attendance_service import (
     get_active_session, start_session as attendance_start_session, get_session_by_id,
     is_code_expired, refresh_code, get_session_records,
     get_suspicious_records, get_enrolled_count, end_session as attendance_end_session,
-    resolve_suspicious,
+    resolve_suspicious as attendance_resolve_suspicious,
 )
 from utils.qr_generator import generate_qr_base64
 
@@ -433,7 +433,7 @@ def resolve_suspicious(record_id):
     decision = request.form.get('decision', '').strip()
     note = request.form.get('note', '').strip() or None
 
-    record, error = resolve_suspicious(record_id, user_id, decision, note)
+    record, error = attendance_resolve_suspicious(record_id, user_id, decision, note)
     if error:
         flash(error, 'error')
         return redirect(url_for('teacher.dashboard'))
@@ -569,12 +569,15 @@ def statistics():
                     AttendanceRecord.student_id == student.id
                 ).all()
                 
-                # Devamsızlık sayısını hesapla
-                absence_count = len([ar for ar in attendance_records if ar.status == 'absent'])
+                total_sessions = db.query(AttendanceSession).filter_by(course_id=course_id).count()
+                present_statuses = statistics_service.PRESENT_STATUSES
+                present_count = len([ar for ar in attendance_records if ar.status in present_statuses])
+                suspicious_count = len([ar for ar in attendance_records if ar.status == 'suspicious'])
+                absence_count = max(total_sessions - present_count - suspicious_count, 0)
             except Exception as e:
                 attendance_records = []
                 absence_count = 0
-            total_sessions = len(attendance_records)
+                total_sessions = 0
             
             student_absences.append({
                 'student': student,
