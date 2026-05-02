@@ -10,11 +10,22 @@ from models.device_pairing import DevicePairing
 from models.location_verification import LocationVerification
 from models.user import User
 from services import attendance_service, statistics_service
-import random
-import string
 from datetime import datetime
 
 student_bp = Blueprint('student', __name__)
+
+
+def _get_valid_device_pairing(user_id):
+    if not current_app.config.get('REQUIRE_DEVICE_PAIRING', True):
+        return True
+    pairing = DevicePairing.get_active_pairing(user_id, db)
+    if not pairing or pairing.is_expired:
+        return None
+    return pairing
+
+
+def _device_pairing_required_message():
+    return 'Yoklamaya katılmak için önce cihaz eşlemesi yapmalısınız.'
 
 
 @student_bp.route('/dashboard')
@@ -52,10 +63,24 @@ def dashboard():
 def check_in(session_id):
     user_id = session['user']['id']
     submitted_code = request.form.get('code', '')
+    if not _get_valid_device_pairing(user_id):
+        flash(_device_pairing_required_message(), 'error')
+        return redirect(url_for('student.verifications'))
+
     override = request.form.get('override') == '1'
     override_reason = request.form.get('override_reason', '').strip() or None
     latitude = request.form.get('latitude', type=float)
     longitude = request.form.get('longitude', type=float)
+    active_verification = LocationVerification.get_active_verification(user_id, db)
+    if active_verification and active_verification.is_expired:
+        active_verification = None
+    if active_verification and latitude is None and longitude is None:
+        latitude = active_verification.latitude
+        longitude = active_verification.longitude
+        if active_verification.is_suspicious and not override:
+            override = True
+            override_reason = 'Ön doğrulama şüpheli olarak tamamlandı.'
+    force_suspicious = bool(active_verification and active_verification.is_suspicious)
 
     record, error = attendance_service.check_in(
         session_id=session_id,
@@ -66,6 +91,7 @@ def check_in(session_id):
         longitude=longitude,
         override=override,
         override_reason=override_reason,
+        force_suspicious=force_suspicious,
     )
     if error:
         flash(error, 'error')
@@ -103,18 +129,37 @@ def verifications():
         user_id = session['user']['id']
         
         # Cihaz eşleme bilgisini al
-        device_pairing = DevicePairing.get_active_pairing(user_id, db)
+        device_pairing = _get_valid_device_pairing(user_id)
         
         # Konum doğrulama bilgisini al
         location_verification = LocationVerification.get_active_verification(user_id, db)
         
         # Mevcut kullanıcı bilgisini al
         current_user = db.query(User).filter_by(id=user_id).first()
+
+        active_attendance = []
+        enrollments = db.query(CourseStudent).filter(CourseStudent.student_id == user_id).all()
+        for enrollment in enrollments:
+            course = db.query(Course).filter_by(id=enrollment.course_id).first()
+            active_session = attendance_service.get_active_session_for_student(enrollment.course_id, user_id)
+            if not course or not active_session:
+                continue
+            existing_record = db.query(AttendanceRecord).filter_by(
+                session_id=active_session.id,
+                student_id=user_id,
+            ).first()
+            active_attendance.append({
+                'course': course,
+                'session': active_session,
+                'checked_in': existing_record is not None,
+                'record': existing_record,
+            })
         
         return render_template('student/verifications.html', 
                              device_pairing=device_pairing,
                              location_verification=location_verification,
-                             current_user=current_user)
+                             current_user=current_user,
+                             active_attendance=active_attendance)
     
     except Exception as e:
         flash(f'Doğrulamalar sayfası yüklenirken hata: {str(e)}', 'error')
@@ -187,6 +232,9 @@ def verify_location():
     """Konum doğrula"""
     try:
         user_id = session['user']['id']
+        if not _get_valid_device_pairing(user_id):
+            return jsonify({'success': False, 'message': _device_pairing_required_message()}), 400
+
         data = request.get_json()
         
         latitude = data.get('latitude')
@@ -203,6 +251,7 @@ def verify_location():
         return jsonify({
             'success': True,
             'in_campus': verification.verified,
+            'is_suspicious': verification.is_suspicious,
             'campus_name': verification.campus_name,
             'distance': verification.distance_from_campus
         })
@@ -211,12 +260,15 @@ def verify_location():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
-@student_bp.route('/api/verify-network')
+@student_bp.route('/api/verify-network', methods=['GET', 'POST'])
 @role_required(2)
 def verify_network():
     """Ağ doğrula"""
     try:
         user_id = session['user']['id']
+        if not _get_valid_device_pairing(user_id):
+            return jsonify({'success': False, 'message': _device_pairing_required_message()}), 400
+
         remote_addr = request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip()
         allowed_prefix = current_app.config.get('ALLOWED_IP_PREFIX')
         trusted_network = (
@@ -234,9 +286,28 @@ def verify_network():
             'success': True,
             'is_eduroam': trusted_network,
             'is_trusted_network': trusted_network,
+            'is_suspicious': verification.is_suspicious,
             'network_info': remote_addr
         })
         
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@student_bp.route('/api/manual-verification', methods=['POST'])
+@role_required(2)
+def manual_verification():
+    """Otomatik doğrulama başarısızsa şüpheli doğrulama oluştur."""
+    try:
+        user_id = session['user']['id']
+        if not _get_valid_device_pairing(user_id):
+            return jsonify({'success': False, 'message': _device_pairing_required_message()}), 400
+
+        verification = LocationVerification(user_id, 'manual')
+        verification.manual_verify()
+        db.add(verification)
+        db.commit()
+        return jsonify({'success': True, 'is_suspicious': True})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
@@ -247,6 +318,8 @@ def start_verification():
     """Doğrulama kodu başlat"""
     try:
         user_id = session['user']['id']
+        if not _get_valid_device_pairing(user_id):
+            return jsonify({'success': False, 'message': _device_pairing_required_message()}), 400
         
         # Aktif konum doğrulamasını kontrol et
         active_verification = LocationVerification.get_active_verification(user_id, db)
@@ -254,15 +327,14 @@ def start_verification():
         if not active_verification or active_verification.is_expired:
             return jsonify({'success': False, 'message': 'Önce konum doğrulaması yapın'}), 400
         
-        # Rastgele 6 haneli kod oluştur
-        code = ''.join(random.choices(string.digits, k=6))
-        
-        # Session'a kodu kaydet
-        session['verification_code'] = code
         session['verification_user_id'] = user_id
         session['verification_expires'] = (datetime.now().timestamp() + 60)  # 60 saniye
         
-        return jsonify({'success': True, 'code': code})
+        return jsonify({
+            'success': True,
+            'is_suspicious': active_verification.is_suspicious,
+            'expires_in': 60,
+        })
         
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -274,13 +346,23 @@ def check_device_pairing():
     """Cihaz eşleme durumunu kontrol et"""
     try:
         user_id = session['user']['id']
+        if not current_app.config.get('REQUIRE_DEVICE_PAIRING', True):
+            return jsonify({
+                'success': True,
+                'has_pairing': True,
+                'can_renew': False,
+                'days_until_renewal': 0,
+                'required': False,
+            })
+
         device_pairing = DevicePairing.get_active_pairing(user_id, db)
         
         return jsonify({
             'success': True,
             'has_pairing': device_pairing is not None,
             'can_renew': device_pairing.can_renew if device_pairing else False,
-            'days_until_renewal': device_pairing.days_until_renewal if device_pairing else 0
+            'days_until_renewal': device_pairing.days_until_renewal if device_pairing else 0,
+            'required': True,
         })
         
     except Exception as e:
@@ -290,40 +372,52 @@ def check_device_pairing():
 @student_bp.route('/api/submit-verification', methods=['POST'])
 @role_required(2)
 def submit_verification():
-    """Doğrulama kodunu gönder"""
+    """Doğrulama sonrası aktif yoklamaya katıl."""
     try:
         user_id = session['user']['id']
-        data = request.get_json()
-        submitted_code = data.get('code')
+        if not _get_valid_device_pairing(user_id):
+            return jsonify({'success': False, 'message': _device_pairing_required_message()}), 400
+
+        data = request.get_json(silent=True) or {}
+        session_id = data.get('session_id')
+        submitted_code = (data.get('code') or '').strip()
         
-        # Session'dan kodu kontrol et
-        stored_code = session.get('verification_code')
         stored_user_id = session.get('verification_user_id')
         expires_at = session.get('verification_expires', 0)
         
-        if not stored_code or stored_user_id != user_id or datetime.now().timestamp() > expires_at:
+        if stored_user_id != user_id or datetime.now().timestamp() > expires_at:
             return jsonify({'success': False, 'message': 'Doğrulama süresi dolmuş veya geçersiz'}), 400
-        
-        if submitted_code != stored_code:
-            return jsonify({'success': False, 'message': 'Yanlış kod'}), 400
         
         # Aktif konum doğrulamasını al
         active_verification = LocationVerification.get_active_verification(user_id, db)
         
         if not active_verification:
             return jsonify({'success': False, 'message': 'Aktif konum doğrulaması bulunamadı'}), 400
-        
-        # Şüpheli ise öğretmen listesine ekle ( AttendanceRecord ile )
-        if active_verification.is_suspicious:
-            # Şüpheli işaretleme burada yapılacak
-            pass
+
+        record, error = attendance_service.check_in(
+            session_id=session_id,
+            student_id=user_id,
+            submitted_code=submitted_code,
+            ip_address=request.remote_addr,
+            latitude=active_verification.latitude,
+            longitude=active_verification.longitude,
+            override=active_verification.is_suspicious,
+            override_reason='Doğrulamalar sayfasından manuel/şüpheli doğrulama' if active_verification.is_suspicious else None,
+            force_suspicious=active_verification.is_suspicious,
+        )
+        if error:
+            return jsonify({'success': False, 'message': error}), 400
         
         # Session'ı temizle
-        session.pop('verification_code', None)
         session.pop('verification_user_id', None)
         session.pop('verification_expires', None)
         
-        return jsonify({'success': True, 'message': 'Doğrulama başarılı'})
+        return jsonify({
+            'success': True,
+            'message': 'Yoklama kaydı oluşturuldu',
+            'status': record.status,
+            'suspicious': record.status == 'suspicious',
+        })
         
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500

@@ -199,8 +199,9 @@ class LocationVerification(Base):
         return db_session.query(cls).filter(
             cls.user_id == user_id,
             cls.is_active == True,
-            cls.verified == True
-        ).first()
+            cls.verified == True,
+            cls.expires_at >= datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        ).order_by(cls.id.desc()).first()
     
     @classmethod
     def cleanup_expired(cls, db_session):

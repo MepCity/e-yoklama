@@ -13,6 +13,7 @@ from database import db
 from models.attendance_record import AttendanceRecord
 from models.attendance_session import AttendanceSession
 from models.course import Course, CourseStudent
+from models.device_pairing import DevicePairing
 from models.user import User
 from services import attendance_service
 from utils.hashing import hash_password
@@ -57,7 +58,30 @@ def login(client, username):
     assert response.status_code in (302, 303), (username, response.status_code)
 
 
+def pair_student_device(student):
+    db.add(DevicePairing(student.id, 'DV:TESTDEVICE01', student.student_number))
+    db.commit()
+
+
 def run():
+    pairing_optional_app = create_app('testing')
+    pairing_optional_app.config['REQUIRE_DEVICE_PAIRING'] = False
+    with pairing_optional_app.app_context():
+        _, _, _, optional_student, _, optional_session = create_fixture()
+        optional_client = pairing_optional_app.test_client()
+        login(optional_client, 'student')
+        optional_check_in = optional_client.post(
+            f'/student/session/{optional_session.id}/check-in',
+            data={'code': 'ABC123', 'override': '1', 'override_reason': 'Demo cihaz eşleşmesi kapalı'},
+            environ_base={'REMOTE_ADDR': '8.8.8.8'},
+        )
+        assert optional_check_in.status_code in (302, 303)
+        optional_record = db.query(AttendanceRecord).filter_by(
+            session_id=optional_session.id,
+            student_id=optional_student.id,
+        ).first()
+        assert optional_record is not None
+
     app = create_app('testing')
     with app.app_context():
         admin, teacher, other_teacher, student, course, att_session = create_fixture()
@@ -72,6 +96,16 @@ def run():
         dashboard = client.get('/student/dashboard')
         assert dashboard.status_code == 200
         assert 'data-offline-attendance' in dashboard.get_data(as_text=True)
+
+        blocked_check_in = client.post(
+            f'/student/session/{att_session.id}/check-in',
+            data={'code': 'ABC123', 'override': '1', 'override_reason': 'Mobil bağlantı'},
+            environ_base={'REMOTE_ADDR': '8.8.8.8'},
+        )
+        assert blocked_check_in.status_code in (302, 303)
+        assert db.query(AttendanceRecord).filter_by(session_id=att_session.id, student_id=student.id).first() is None
+
+        pair_student_device(student)
 
         check_in = client.post(
             f'/student/session/{att_session.id}/check-in',
@@ -114,6 +148,35 @@ def run():
         assert all_export.status_code == 200
         all_workbook = load_workbook(BytesIO(all_export.data))
         assert 'Genel Özet' in all_workbook.sheetnames
+
+        verification_session = AttendanceSession(
+            course_id=course.id,
+            teacher_id=teacher.id,
+            current_code='XYZ789',
+            code_expires_at=(datetime.utcnow() + timedelta(minutes=5)).isoformat(),
+            code_refresh_seconds=10,
+            allowed_ip_prefix='10.0.',
+        )
+        db.add(verification_session)
+        db.commit()
+
+        client.get('/logout')
+        login(client, 'student')
+        manual = client.post('/student/api/manual-verification')
+        assert manual.status_code == 200
+        start_verification = client.get('/student/api/start-verification')
+        assert start_verification.status_code == 200
+        verification_check_in = client.post(
+            '/student/api/submit-verification',
+            json={'session_id': verification_session.id, 'code': 'XYZ789'},
+        )
+        assert verification_check_in.status_code == 200
+        verification_record = db.query(AttendanceRecord).filter_by(
+            session_id=verification_session.id,
+            student_id=student.id,
+        ).first()
+        assert verification_record is not None
+        assert verification_record.status == 'suspicious'
 
         expired_session = AttendanceSession(
             course_id=course.id,

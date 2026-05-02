@@ -92,6 +92,40 @@
     </div>
 </div>
 
+<div class="verification-card attendance-card">
+    <div class="card-header">
+        <h2>Aktif Yoklamalar</h2>
+        <p>Doğrulama tamamlandıktan sonra öğretmenin gösterdiği yoklama kodunu girin.</p>
+    </div>
+    <div class="card-body">
+        {% if active_attendance %}
+            <div class="attendance-list">
+                {% for item in active_attendance %}
+                    <div class="attendance-item">
+                        <div>
+                            <strong>{{ item.course.name }}</strong>
+                            <span>{{ item.course.code or '' }}</span>
+                        </div>
+                        {% if item.checked_in %}
+                            <span class="status-text">Kaydedildi: {{ item.record.status }}</span>
+                        {% elif not device_pairing %}
+                            <button type="button" class="btn btn-secondary" disabled>
+                                Önce Cihaz Eşle
+                            </button>
+                        {% else %}
+                            <button type="button" class="btn btn-primary attendanceStartBtn" data-session-id="{{ item.session.id }}">
+                                Yoklamaya Katıl
+                            </button>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>Şu anda katılabileceğiniz aktif yoklama bulunmuyor.</p>
+        {% endif %}
+    </div>
+</div>
+
 <!-- Konum Doğrulama Modal -->
 <div id="locationModal" class="modal">
     <div class="modal-content">
@@ -146,14 +180,11 @@
                 
                 <div class="step hidden" id="step4">
                     <h4>Adım 4: Yoklama Kodu</h4>
-                    <p>Doğrulama aktif! Lütfen aşağıdaki kodu girin veya QR kodu okutun.</p>
-                    <div class="verification-code">
-                        <div id="currentCode" class="code-display">----</div>
-                        <div class="code-timer">
-                            <span>Kalan süre: </span>
-                            <span id="countdown">60</span>
-                            <span> saniye</span>
-                        </div>
+                    <p>Doğrulama aktif. Öğretmenin gösterdiği yoklama kodunu girin.</p>
+                    <div class="code-timer">
+                        <span>Kalan süre: </span>
+                        <span id="countdown">60</span>
+                        <span> saniye</span>
                     </div>
                     <div class="verification-methods">
                         <div class="method-input">
@@ -209,6 +240,31 @@
     border-radius: 12px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     overflow: hidden;
+}
+
+.attendance-card {
+    margin-top: 20px;
+}
+
+.attendance-list {
+    display: grid;
+    gap: 12px;
+}
+
+.attendance-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
+
+.attendance-item span {
+    display: block;
+    color: #64748b;
+    font-size: 0.9rem;
 }
 
 .card-header {
@@ -430,6 +486,7 @@
 const locationModal = document.getElementById('locationModal');
 const pairingModal = document.getElementById('pairingModal');
 const closeBtns = document.querySelectorAll('.close');
+let selectedSessionId = null;
 
 closeBtns.forEach(btn => {
     btn.onclick = function() {
@@ -465,6 +522,14 @@ document.getElementById('cancelPairingBtn')?.addEventListener('click', function(
 document.getElementById('verifyLocationBtn')?.addEventListener('click', function() {
     locationModal.style.display = 'block';
     showStep(1);
+});
+
+document.querySelectorAll('.attendanceStartBtn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        selectedSessionId = this.getAttribute('data-session-id');
+        locationModal.style.display = 'block';
+        showStep(1);
+    });
 });
 
 document.getElementById('requestLocationBtn')?.addEventListener('click', function() {
@@ -591,9 +656,31 @@ async function checkNetworkVerification() {
 // Doğrulama kodu başlatma
 document.getElementById('continueToQRBtn')?.addEventListener('click', startVerification);
 document.getElementById('continueToQRBtn2')?.addEventListener('click', startVerification);
-document.getElementById('manualContinueBtn')?.addEventListener('click', startVerification);
+document.getElementById('manualContinueBtn')?.addEventListener('click', async function() {
+    try {
+        const response = await fetch('/student/api/manual-verification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const result = await response.json();
+        if (!result.success) {
+            alert('Manuel doğrulama başlatılamadı: ' + result.message);
+            return;
+        }
+        startVerification();
+    } catch (error) {
+        alert('Manuel doğrulama sırasında hata: ' + error.message);
+    }
+});
 
 async function startVerification() {
+    if (!selectedSessionId) {
+        alert('Doğrulama kaydedildi. Aktif yoklamaya katılmak için aşağıdaki listeden bir yoklama seçin.');
+        locationModal.style.display = 'none';
+        location.reload();
+        return;
+    }
+
     showStep(4);
     
     try {
@@ -601,8 +688,9 @@ async function startVerification() {
         const result = await response.json();
         
         if (result.success) {
-            document.getElementById('currentCode').textContent = result.code;
             startCountdown(60);
+        } else {
+            alert('Doğrulama başlatılamadı: ' + result.message);
         }
     } catch (error) {
         alert('Doğrulama başlatılamadı: ' + error.message);
@@ -629,6 +717,10 @@ function startCountdown(seconds) {
 // Kod gönderme
 document.getElementById('submitCodeBtn')?.addEventListener('click', async function() {
     const code = document.getElementById('codeInput').value;
+    if (!selectedSessionId) {
+        alert('Aktif yoklama seçilmedi.');
+        return;
+    }
     
     try {
         const response = await fetch('/student/api/submit-verification', {
@@ -636,13 +728,13 @@ document.getElementById('submitCodeBtn')?.addEventListener('click', async functi
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ code: code })
+            body: JSON.stringify({ session_id: selectedSessionId, code: code })
         });
         
         const result = await response.json();
         
         if (result.success) {
-            alert('Doğrulama başarılı!');
+            alert(result.suspicious ? 'Yoklama şüpheli olarak öğretmen onayına gönderildi.' : 'Yoklama kaydınız doğrulandı.');
             locationModal.style.display = 'none';
             location.reload();
         } else {

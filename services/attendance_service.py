@@ -199,7 +199,8 @@ def resolve_suspicious(record_id, teacher_id, decision, note=None):
 
 
 def check_in(session_id, student_id, submitted_code, ip_address=None,
-             latitude=None, longitude=None, override=False, override_reason=None):
+             latitude=None, longitude=None, override=False, override_reason=None,
+             force_suspicious=False):
     att_session = db.query(AttendanceSession).filter_by(
         id=session_id,
         status='active',
@@ -243,18 +244,19 @@ def check_in(session_id, student_id, submitted_code, ip_address=None,
         _log_verification(None, student_id, session_id, verification['failed_layer'], 'fail', verification['reason'])
         return None, _verification_message(verification)
 
+    is_suspicious = force_suspicious or not verification['ok']
     record = AttendanceRecord(
         session_id=session_id,
         student_id=student_id,
         course_id=att_session.course_id,
-        status='verified' if verification['ok'] else 'suspicious',
+        status='suspicious' if is_suspicious else 'verified',
         submitted_code=normalized_code,
         ip_address=ip_address,
         ip_match=verification.get('ip_match'),
         gps_match=verification.get('gps_match'),
         gps_distance_m=verification.get('gps_distance_m'),
-        override_used=1 if override and not verification['ok'] else 0,
-        override_reason=override_reason if override and not verification['ok'] else None,
+        override_used=1 if is_suspicious and (override or force_suspicious) else 0,
+        override_reason=override_reason if is_suspicious and (override or force_suspicious) else None,
     )
     db.add(record)
     db.commit()
@@ -266,7 +268,7 @@ def check_in(session_id, student_id, submitted_code, ip_address=None,
     if verification.get('gps_match') is not None:
         _log_verification(record.id, student_id, session_id, 'gps', 'pass' if verification['gps_match'] else 'fail', verification.get('reason'))
     if record.status == 'suspicious':
-        _log_verification(record.id, student_id, session_id, verification['failed_layer'], 'override', verification['reason'])
+        _log_verification(record.id, student_id, session_id, verification['failed_layer'] or 'manual', 'override', verification['reason'] or 'FORCED_SUSPICIOUS')
     return record, None
 
 

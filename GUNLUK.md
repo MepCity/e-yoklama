@@ -1404,6 +1404,126 @@ Ek düzeltmeler:
 
 ---
 
+### 24. Verifications + Cihaz Eşleşmesi Entegrasyonu
+
+**Tarih:** 2026-05-02
+
+#### 24.1. Tespit Edilen Eksik
+
+Öğrenci rolündeki `verifications` sayfası cihaz eşleme ve konum doğrulaması için açılmıştı; ancak bu doğrulama sonucu aktif yoklama kaydıyla tam entegre değildi.
+
+Eksik davranışlar:
+- `verifications` sayfasında aktif yoklama seçimi yoktu.
+- `/api/submit-verification` doğrulama kodunu onaylıyor ancak `AttendanceRecord` oluşturmuyordu.
+- Manuel/başarısız doğrulama öğretmen tarafındaki şüpheli yoklama onay akışına düşmüyordu.
+- Cihaz eşleşmesi UI'da görünse de check-in endpoint'lerinde server-side zorunlu değildi.
+
+#### 24.2. Yapılan Düzeltmeler
+
+- `views/student.py`
+  - Öğrenci `verifications` sayfasına aktif yoklamalar listesi eklendi.
+  - `manual_verification` endpoint'i eklendi; otomatik GPS/ağ doğrulaması başarısızsa aktif doğrulama şüpheli olarak oluşturulur.
+  - `submit_verification` artık seçili `session_id` ve öğretmenin gösterdiği yoklama koduyla `attendance_service.check_in(...)` çağırır.
+  - Şüpheli manuel doğrulamalar `force_suspicious=True` ile gerçek `AttendanceRecord.status = 'suspicious'` kaydına dönüşür.
+  - `check_in`, `verify-location`, `verify-network`, `manual-verification`, `start-verification`, `submit-verification` endpoint'lerine aktif cihaz eşleşmesi kontrolü eklendi.
+
+- `services/attendance_service.py`
+  - `check_in(...)` fonksiyonuna `force_suspicious` parametresi eklendi.
+  - Doğrulama teknik olarak geçse bile manuel/şüpheli ön doğrulama varsa kayıt `suspicious` oluşturulur.
+  - Şüpheli kayıtlar için verification log'a `manual` / `FORCED_SUSPICIOUS` detayı yazılır.
+
+- `models/location_verification.py`
+  - `get_active_verification(...)` yalnızca süresi dolmamış en güncel doğrulamayı döndürecek şekilde güncellendi.
+
+- `templates/student/verifications.html`
+  - Aktif yoklamalar kartı eklendi.
+  - Cihaz eşleşmesi yoksa aktif yoklama butonu disabled gösterilir.
+  - Öğrenci doğrulamadan sonra öğretmenin gösterdiği yoklama kodunu girerek aynı ekrandan yoklamaya katılabilir.
+  - Şüpheli kayıt oluşursa kullanıcıya öğretmen onayına gönderildiği bildirilir.
+
+- `templates/student/dashboard.html`
+  - GPS başarılı olduğunda koordinatlar check-in formuna taşınır.
+  - Daha önce yapılmış aktif konum doğrulaması varsa dashboard check-in akışı bunu kullanabilir.
+
+#### 24.3. Test Kapsamı
+
+`tests/integration_check.py` güncellendi:
+- Cihaz eşleşmesi olmadan yoklama denemesi reddedilir.
+- Cihaz eşleşmesi sonrası dashboard check-in akışı çalışır.
+- `verifications` üzerinden manuel doğrulama + aktif yoklama kodu gönderimi gerçek `AttendanceRecord` oluşturur.
+- Manuel doğrulama kaynaklı kayıt `suspicious` olur ve öğretmen onay akışına uygundur.
+
+#### 24.4. Doğrulama
+
+- `PYTHONPYCACHEPREFIX=/private/tmp/e-yoklama-pycache python3 -m compileall .` başarılı.
+- `python3 tests/integration_check.py` başarılı (`integration ok`).
+
+---
+
+### 25. Dashboard Override ve Cihaz Eşleşmesi Konfigürasyonu
+
+**Tarih:** 2026-05-02
+
+#### 25.1. Tespit Edilen Sorunlar
+
+`verifications` entegrasyonu sonrası iki regresyon riski tespit edildi:
+
+1. Dashboard üzerindeki override akışı `/api/start-verification` çağırıyordu; fakat otomatik GPS/ağ doğrulaması başarısız olduğunda aktif `LocationVerification` oluşmadığı için endpoint `400` dönüyordu.
+2. Dashboard JS hâlâ `/api/start-verification` response'unda `code` alanı bekliyordu; endpoint artık öğretmen kodunu üretmediği için UI'da bu alan anlamsız hale gelmişti.
+3. Cihaz eşleşmesi server-side zorunlu hale geldiği için demo/test ortamında mevcut seed öğrencileri cihaz eşlemeden yoklama veremiyordu.
+
+#### 25.2. Yapılan Düzeltmeler
+
+- `templates/student/dashboard.html`
+  - Override butonu önce `/student/api/manual-verification` çağırır, ardından `/student/api/start-verification` ile doğrulama penceresini başlatır.
+  - `result.code` beklentisi kaldırıldı.
+  - Modal metni öğretmenin gösterdiği yoklama kodunun girilmesine göre düzenlendi.
+
+- `config.py`
+  - `REQUIRE_DEVICE_PAIRING` ayarı eklendi.
+  - Varsayılan değer production/dev için `true`; ortam değişkeniyle kapatılabilir:
+
+```bash
+REQUIRE_DEVICE_PAIRING=false
+```
+
+- `views/student.py`
+  - Aktif cihaz eşleşmesi kontrolü `REQUIRE_DEVICE_PAIRING` config değerine bağlandı.
+  - Config kapalıysa yoklama ve doğrulama endpoint'leri cihaz eşleşmesi aramaz.
+
+- `tests/integration_check.py`
+  - Cihaz eşleşmesi config ile kapatıldığında check-in akışının eşleşmesiz çalıştığı doğrulandı.
+  - Cihaz eşleşmesi açıkken eşleşmesiz yoklama reddedilir; eşleşme sonrası akış çalışır.
+
+#### 25.3. Beklenen Davranış
+
+- Production/dev varsayılanında cihaz eşleşmesi zorunludur.
+- Demo veya sınıf içi hızlı test için `REQUIRE_DEVICE_PAIRING=false` kullanılabilir.
+- Override yolunda öğrenci manuel/şüpheli doğrulama oluşturabilir ve kayıt öğretmen onayına `suspicious` olarak düşer.
+
+---
+
+### 26. Dashboard Cihaz Eşleşmesi UX Kontrolü
+
+**Tarih:** 2026-05-02
+
+#### 26.1. Tespit Edilen UX Eksikliği
+
+Cihaz eşleşmesi olmayan öğrenci dashboard'dan "Yoklamaya Gir" dediğinde modal açılıyor, GPS/network doğrulama denemeleri yapılıyor ve cihaz eşleşmesi eksikliği ancak daha sonra ortaya çıkıyordu. Bu kritik bir backend bug değildi; server-side kontroller zaten vardı. Ancak kullanıcı hatayı geç görüyordu.
+
+#### 26.2. Yapılan Düzeltmeler
+
+- `views/student.py`
+  - `/student/api/check-device-pairing` endpoint'i `REQUIRE_DEVICE_PAIRING` config değerini dikkate alır.
+  - Config kapalıysa API `has_pairing=True`, `required=False` döndürür.
+
+- `templates/student/dashboard.html`
+  - "Yoklamaya Gir" tıklanınca modal açmadan önce `/student/api/check-device-pairing` çağrılır.
+  - Cihaz eşleşmesi zorunlu ve eksikse kullanıcı hemen bilgilendirilir ve `Doğrulamalar` sayfasına yönlendirilir.
+  - Böylece gereksiz GPS/network denemeleri yapılmaz.
+
+---
+
 ### Sonraki Adımlar
 
 Branch `main` ile merge edilmeye hazır. Gelecekte yapılabilecek geliştirmeler:

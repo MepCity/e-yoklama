@@ -44,14 +44,11 @@
                 
                 <div class="step hidden" id="step2">
                     <h4>Adım 2: Yoklama Kodu</h4>
-                    <p>Doğrulama başarılı! Lütfen yoklama kodunu girin veya QR kodu okutun.</p>
-                    <div class="verification-code">
-                        <div id="currentCode" class="code-display">----</div>
-                        <div class="code-timer">
-                            <span>Kalan süre: </span>
-                            <span id="countdown">60</span>
-                            <span> saniye</span>
-                        </div>
+                    <p>Doğrulama aktif. Öğretmenin gösterdiği yoklama kodunu girin.</p>
+                    <div class="code-timer">
+                        <span>Kalan süre: </span>
+                        <span id="countdown">60</span>
+                        <span> saniye</span>
                     </div>
                     <div class="verification-methods">
                         <div class="method-input">
@@ -195,6 +192,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const closeBtn = modal.querySelector('.close');
     let currentSessionId = null;
     let countdownTimer = null;
+    let verifiedCoords = null;  // GPS başarılıysa koordinatları burada sakla
 
     closeBtn.onclick = () => { modal.style.display = 'none'; clearTimer(); };
     window.onclick = (e) => { if (e.target === modal) { modal.style.display = 'none'; clearTimer(); } };
@@ -204,8 +202,24 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     document.querySelectorAll('.check-in-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
+        btn.addEventListener('click', async function () {
             currentSessionId = this.getAttribute('data-session-id');
+            verifiedCoords = null;
+
+            try {
+                const pairingRes = await fetch('/student/api/check-device-pairing');
+                const pairing = await pairingRes.json();
+                if (pairing.success && pairing.required !== false && !pairing.has_pairing) {
+                    alert('Yoklamaya katılmak için önce cihaz eşlemesi yapmalısınız.');
+                    window.location.href = '/student/verifications';
+                    return;
+                }
+            } catch (_) {
+                alert('Cihaz eşleşmesi kontrol edilemedi. Lütfen Doğrulamalar sayfasını kontrol edin.');
+                window.location.href = '/student/verifications';
+                return;
+            }
+
             modal.style.display = 'block';
             showStep(1);
         });
@@ -243,6 +257,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const position = await new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000 });
         });
+
+        verifiedCoords = { lat: position.coords.latitude, lng: position.coords.longitude };
 
         const res = await fetch('/student/api/verify-location', {
             method: 'POST',
@@ -290,7 +306,22 @@ document.addEventListener('DOMContentLoaded', function () {
             <button id="overrideBtn" class="btn btn-warning">Yine de Devam Et (Şüpheli)</button>
             <button id="cancelVerifBtn" class="btn btn-secondary" style="margin-left:8px">Vazgeç</button>
         `;
-        document.getElementById('overrideBtn').addEventListener('click', () => startVerificationCode(true));
+        document.getElementById('overrideBtn').addEventListener('click', async () => {
+            try {
+                const res = await fetch('/student/api/manual-verification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await res.json();
+                if (!result.success) {
+                    alert('Manuel doğrulama başlatılamadı: ' + result.message);
+                    return;
+                }
+                startVerificationCode(true);
+            } catch (err) {
+                alert('Manuel doğrulama sırasında hata: ' + err.message);
+            }
+        });
         document.getElementById('cancelVerifBtn').addEventListener('click', () => {
             modal.style.display = 'none';
         });
@@ -302,7 +333,6 @@ document.addEventListener('DOMContentLoaded', function () {
             const result = await res.json();
 
             if (result.success) {
-                document.getElementById('currentCode').textContent = result.code;
                 // Override bilgisini 2. adıma taşı
                 document.getElementById('step2').dataset.override = isOverride ? '1' : '0';
                 showStep(2);
@@ -350,9 +380,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const formData = new FormData();
         formData.append('code', code);
+        if (verifiedCoords) {
+            formData.append('latitude', verifiedCoords.lat);
+            formData.append('longitude', verifiedCoords.lng);
+        }
         if (isOverride) {
             formData.append('override', '1');
-            formData.append('override_reason', 'GPS/ağ doğrulaması HTTP ortamında kullanılamadı');
+            formData.append('override_reason', 'GPS/ağ doğrulaması kullanılamadı');
         }
 
         try {
