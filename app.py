@@ -48,10 +48,6 @@ def create_app(config_name='development'):
                 return redirect(url_for('student.dashboard'))
         return redirect(url_for('auth.login_page'))
 
-    @app.route('/debug-test')
-    def debug_test():
-        return "Sunucu çalışıyor, rota bulundu!", 200
-
     @app.route('/sw.js')
     def service_worker():
         return send_from_directory(app.root_path, 'sw.js', mimetype='application/javascript')

@@ -41,16 +41,12 @@ def validate_context(att_session, ip_address=None, latitude=None, longitude=None
 
 
 def validate_ip(ip_address, allowed_prefix):
-    # Local ağda IP doğrulamasını geçici olarak devre dışı bırak
     if not allowed_prefix:
         return {'ok': True, 'reason': None}
     if not ip_address:
-        return {'ok': True, 'reason': 'IP_BYPASS_LOCAL'}  # Local ağda bypass
+        return {'ok': False, 'reason': 'IP_MISSING'}
     if ip_address in ('127.0.0.1', '::1'):
         return {'ok': True, 'reason': 'LOCALHOST_BYPASS'}
-    # Local ağda tüm IP'lere izin ver
-    if ip_address.startswith(('192.168.', '10.', '172.')):
-        return {'ok': True, 'reason': 'LOCAL_NETWORK_BYPASS'}
     if ip_address.startswith(allowed_prefix):
         return {'ok': True, 'reason': None}
     return {'ok': False, 'reason': 'IP_NOT_ALLOWED'}

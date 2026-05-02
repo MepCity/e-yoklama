@@ -185,203 +185,179 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // Modal işlemleri
     const modal = document.getElementById('verificationModal');
     const closeBtn = modal.querySelector('.close');
     let currentSessionId = null;
-    
-    closeBtn.onclick = function() {
-        modal.style.display = 'none';
-    };
-    
-    window.onclick = function(event) {
-        if (event.target == modal) {
-            modal.style.display = 'none';
-        }
-    };
-    
-    // Yoklamaya Gir butonları
+    let countdownTimer = null;
+
+    closeBtn.onclick = () => { modal.style.display = 'none'; clearTimer(); };
+    window.onclick = (e) => { if (e.target === modal) { modal.style.display = 'none'; clearTimer(); } };
+
+    function clearTimer() {
+        if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+    }
+
     document.querySelectorAll('.check-in-btn').forEach(btn => {
-        btn.addEventListener('click', async function() {
+        btn.addEventListener('click', function () {
             currentSessionId = this.getAttribute('data-session-id');
-            
-            // Cihaz eşleme kontrolü
-            if (this.getAttribute('data-requires-pairing') === 'true') {
-                try {
-                    const response = await fetch('/student/api/check-device-pairing');
-                    const result = await response.json();
-                    
-                    if (!result.has_pairing) {
-                        alert('Yoklamaya katılmak için önce cihaz eşlemesi yapmanız gerekiyor. Doğrulamalar sayfasına gidin.');
-                        return;
-                    }
-                } catch (error) {
-                    alert('Cihaz eşleme durumu kontrol edilemedi. Lütfen sayfayı yenileyin.');
-                    return;
-                }
-            }
-            
             modal.style.display = 'block';
             showStep(1);
         });
     });
-    
-    // Doğrulama adımları
-    function showStep(stepNumber) {
-        document.querySelectorAll('.step').forEach(step => {
-            step.classList.add('hidden');
-        });
-        document.getElementById('step' + stepNumber).classList.remove('hidden');
+
+    function showStep(n) {
+        document.querySelectorAll('.step').forEach(s => s.classList.add('hidden'));
+        document.getElementById('step' + n).classList.remove('hidden');
     }
-    
-    // Doğrulamayı başlat
-    document.getElementById('startVerificationBtn').addEventListener('click', async function() {
+
+    // Konum doğrulama zinciri:
+    // 1. GPS dene  →  2. Network dene  →  3. Override ile devam
+    document.getElementById('startVerificationBtn').addEventListener('click', async function () {
+        this.disabled = true;
+        this.textContent = 'Doğrulanıyor...';
+
         try {
-            // Konum izni iste
-            const position = await new Promise((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(resolve, reject);
-            });
-            
-            // Konum doğrulama
-            const response = await fetch('/student/api/verify-location', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude
-                })
-            });
-            
-            const result = await response.json();
-            
-            if (result.in_campus) {
-                // GPS başarılı, kodu başlat
-                await startVerificationCode();
-            } else {
-                // GPS başarısız, ağ kontrolü
-                const networkInfo = {
-                    ssid: 'unknown', // Gerçek uygulamada WiFi API ile alınır
-                    network_type: 'wifi'
-                };
-                
-                const networkResponse = await fetch('/student/api/verify-network', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(networkInfo)
-                });
-                const networkResult = await networkResponse.json();
-                
-                if (networkResult.is_eduroam) {
-                    await startVerificationCode();
-                } else {
-                    // Manuel doğrulama
-                    if (confirm('Otomatik doğrulama başarısız oldu. Şüpheli olarak devam etmek istiyor musunuz?')) {
-                        await startVerificationCode();
-                    } else {
-                        modal.style.display = 'none';
-                    }
-                }
-            }
-            
-        } catch (error) {
-            alert('Doğrulama sırasında hata: ' + error.message);
+            await tryGpsVerification();
+        } catch (_) {
+            // GPS erişilemez (insecure context, izin reddedildi vb.)
+            await tryNetworkVerification();
+        } finally {
+            this.disabled = false;
+            this.textContent = 'Doğrulamayı Başlat';
         }
     });
-    
-    // Doğrulama kodunu başlat
-    async function startVerificationCode() {
+
+    async function tryGpsVerification() {
+        // navigator.geolocation HTTP+ağ IP üzerinde mevcut olmayabilir;
+        // mevcut değilse direkt hata fırlat, chain bir sonraki adıma geçer.
+        if (!navigator.geolocation) {
+            throw new Error('GPS kullanılamıyor');
+        }
+
+        const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000 });
+        });
+
+        const res = await fetch('/student/api/verify-location', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy
+            })
+        });
+        const result = await res.json();
+
+        if (result.in_campus) {
+            await startVerificationCode();
+        } else {
+            // GPS dışarıda çıktı, network'e geç
+            await tryNetworkVerification();
+        }
+    }
+
+    async function tryNetworkVerification() {
         try {
-            const response = await fetch('/student/api/start-verification');
-            const result = await response.json();
-            
+            const res = await fetch('/student/api/verify-network', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ network_type: 'wifi' })
+            });
+            const result = await res.json();
+
+            if (result.is_eduroam) {
+                await startVerificationCode();
+                return;
+            }
+        } catch (_) { /* network isteği de başarısız — override'a düş */ }
+
+        // Son çare: öğrenciye şüpheli devam seçeneği sun
+        offerOverride();
+    }
+
+    function offerOverride() {
+        const step1 = document.getElementById('step1');
+        step1.innerHTML = `
+            <h4>Konum Doğrulanamadı</h4>
+            <p>GPS ve ağ doğrulaması tamamlanamadı. Kaydınız <strong>şüpheli</strong> olarak işaretlenip öğretmen onayına gönderilecektir.</p>
+            <p><small>HTTP üzerinde tarayıcı konum iznini bloklar — HTTPS gereklidir.</small></p>
+            <button id="overrideBtn" class="btn btn-warning">Yine de Devam Et (Şüpheli)</button>
+            <button id="cancelVerifBtn" class="btn btn-secondary" style="margin-left:8px">Vazgeç</button>
+        `;
+        document.getElementById('overrideBtn').addEventListener('click', () => startVerificationCode(true));
+        document.getElementById('cancelVerifBtn').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+    }
+
+    async function startVerificationCode(isOverride = false) {
+        try {
+            const res = await fetch('/student/api/start-verification');
+            const result = await res.json();
+
             if (result.success) {
                 document.getElementById('currentCode').textContent = result.code;
+                // Override bilgisini 2. adıma taşı
+                document.getElementById('step2').dataset.override = isOverride ? '1' : '0';
                 showStep(2);
                 startCountdown(60);
             } else {
                 alert('Doğrulama başlatılamadı: ' + result.message);
             }
-        } catch (error) {
-            alert('Doğrulama başlatılamadı: ' + error.message);
+        } catch (err) {
+            alert('Doğrulama başlatılamadı: ' + err.message);
         }
     }
-    
-    // Geri sayım
+
     function startCountdown(seconds) {
+        clearTimer();
         let remaining = seconds;
-        const countdownElement = document.getElementById('countdown');
-        
-        const timer = setInterval(() => {
+        const el = document.getElementById('countdown');
+        countdownTimer = setInterval(() => {
             remaining--;
-            countdownElement.textContent = remaining;
-            
+            el.textContent = remaining;
             if (remaining <= 0) {
-                clearInterval(timer);
+                clearTimer();
                 modal.style.display = 'none';
-                alert('Doğrulama süresi doldu!');
+                alert('Doğrulama süresi doldu. Lütfen tekrar deneyin.');
             }
         }, 1000);
     }
-    
-    // Kod gönderme
-    document.getElementById('submitCodeBtn').addEventListener('click', async function() {
-        const code = document.getElementById('codeInput').value;
-        
-        try {
-            const response = await fetch('/student/api/submit-verification', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ code: code })
-            });
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                // Yoklamaya gir
-                await submitAttendance(currentSessionId, code);
-                modal.style.display = 'none';
-                location.reload();
-            } else {
-                alert('Doğrulama başarısız: ' + result.message);
-            }
-        } catch (error) {
-            alert('Doğrulama sırasında hata: ' + error.message);
+
+    document.getElementById('submitCodeBtn').addEventListener('click', async function () {
+        const code = document.getElementById('codeInput').value.trim().toUpperCase();
+        if (!code) { alert('Lütfen kodu girin.'); return; }
+
+        const isOverride = document.getElementById('step2').dataset.override === '1';
+        const formData = new FormData();
+        formData.append('code', code);
+        if (isOverride) {
+            formData.append('override', '1');
+            formData.append('override_reason', 'GPS/ağ doğrulaması HTTP ortamında kullanılamadı');
         }
-    });
-    
-    // Yoklamayı gönder
-    async function submitAttendance(sessionId, code) {
+
         try {
-            const formData = new FormData();
-            formData.append('session_id', sessionId);
-            formData.append('code', code);
-            
-            const response = await fetch(`/session/${sessionId}/check-in`, {
+            const res = await fetch(`/student/session/${currentSessionId}/check-in`, {
                 method: 'POST',
                 body: formData
             });
-            
-            const result = await response.text();
-            
-            if (response.ok) {
-                alert('Yoklamaya başarıyla katıldınız!');
+
+            if (res.redirected || res.ok) {
+                clearTimer();
+                modal.style.display = 'none';
+                location.reload();
             } else {
-                alert('Yoklama hatası: ' + result);
+                const text = await res.text();
+                alert('Yoklama hatası. Lütfen sayfayı yenileyip tekrar deneyin.');
             }
-        } catch (error) {
-            alert('Yoklama sırasında hata: ' + error.message);
+        } catch (err) {
+            alert('Bağlantı hatası: ' + err.message);
         }
     });
-    
-    // QR tarama (basit implementasyon)
-    document.getElementById('scanQRBtn').addEventListener('click', function() {
-        alert('QR tarama özelliği tarayıcı desteği gerektirir. Lütfen kodu manuel olarak girin.');
+
+    document.getElementById('scanQRBtn').addEventListener('click', function () {
+        alert('QR tarama özelliği tarayıcı kamera izni gerektirir. Lütfen kodu manuel olarak girin.');
     });
 });
 </script>

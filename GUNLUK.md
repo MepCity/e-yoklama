@@ -1275,4 +1275,139 @@ python3 tests/integration_check.py
 
 ---
 
-*Sonraki adımlar bu dosyaya eklenecektir.*
+---
+
+## 2026-05-02 — fk/general-dev Branch İnceleme + Temizlik + Düzeltmeler
+
+### 22. fk/general-dev Analizi
+
+**Tarih:** 2026-05-02
+
+`fk/general-dev` branch'i main'e göre 2 commit öndeydi ve 6.300+ satır ekleme içeriyordu. Branch incelendi; yeni özellikler tespit edildi ve birden fazla kritik sorun belirlendi.
+
+#### 22.1. Eklenen Yeni Özellikler
+
+| Alan | İçerik |
+|------|--------|
+| **Yeni Modeller** | `Building`, `Classroom` (fiziksel derslik yönetimi), `DevicePairing` (MAC tabanlı cihaz eşleme, 30 günlük TTL), `LocationVerification` (GPS/eduroam doğrulama, 1 dk TTL), `PopularCourse` |
+| **Course Modeli** | `building_id`, `classroom_id`, `day_of_week`, `start_time`, `end_time`, `teacher_approval`, `status` alanları eklendi |
+| **CourseStudent** | `admin_approval` alanı eklendi |
+| **Onay Sistemi** | Ders oluşturma ve öğrenci kaydı için öğretmen/admin onay iş akışı |
+| **Öğretmen** | Ders detay sayfası, öğrenci yoklama geçmişi, tüm program görünümü, program düzenleme, onay ekranları |
+| **Öğrenci** | Ders programı sayfası, doğrulamalar sayfası |
+| **Admin** | Öğrenci/öğretmen/ders toggle (aktif/pasif), kayıt onay ekranı, program yönetimi |
+| **Toggle Route'ları** | `toggle_student`, `toggle_teacher`, `toggle_course` endpoint'leri |
+
+#### 22.2. Tespit Edilen Sorunlar
+
+1. **`pandas` requirements.txt'te yoktu** → `import pandas as pd` ile `views/teacher.py` başlatılamıyordu.
+2. **`navigator.geolocation` insecure context kısıtı** → `flask run --host=0.0.0.0` ile erişildiğinde tarayıcı `http://192.168.x.x` adresinde geolocation API'yi blokluyor, doğrulama akışı tamamen kırılıyordu.
+3. **`attendance_service.resolve_suspicious` hatalı çağrı** → modül import edilmemişken modül adıyla çağrılıyordu (`NameError`).
+4. **`models/classroom.py` yanlış import** → `from database import Base` yerine `from database.session import Base` olmalıydı.
+5. **`verification_service.py` aşırı geniş IP bypass** → tüm private ağlar (`192.168.`, `10.`, `172.`) bypass ediliyordu; orijinal sadece localhost bypass'ına döndürüldü.
+6. **Nav template debug kalıntıları** → "Doğrulamalar" linki rol kontrolü dışında herkese gösteriliyordu; admin/öğretmen de görüyordu.
+7. **`app.py` debug route** → `/debug-test` endpoint'i production'a sızmıştı.
+8. **`print()` debug satırları** → `views/teacher.py`'de birden fazla `print()` ifadesi vardı.
+9. **Kirli commit'ler** → `.pyc` dosyaları, `e_yoklama.db`, `check_db.py`, `database_check.py`, `update_database.py`, `seed_*_fixed.py` git'e commit'lenmişti.
+
+---
+
+### 23. fk/general-dev Temizlik + Düzeltme Operasyonu
+
+**Tarih:** 2026-05-02
+
+#### 23.1. Kirli Dosyalar Temizlendi
+
+`git rm --cached` ile git tracking'den çıkarıldı ve diskten silindi:
+- `database/__pycache__/`, `models/__pycache__/`, `services/__pycache__/`, `sockets/__pycache__/`, `utils/__pycache__/`, `views/__pycache__/` — tüm pycache klasörleri
+- `e_yoklama.db` — canlı veritabanı dosyası
+- `check_db.py`, `database_check.py`, `update_database.py` — tek kullanımlık debug script'leri
+- `seed_courses_fixed.py`, `seed_popular_courses.py`, `seed_popular_courses_fixed.py` — fazladan seed dosyaları
+
+`.gitignore` mevcut kurallar zaten doğruydu; sorun önceki commit'lerden geliyordu.
+
+#### 23.2. requirements.txt — pandas Eklendi
+
+```
+pandas==2.2.3
+```
+
+`views/teacher.py`'deki `import pandas as pd` ve `course_schedule` view'ındaki DataFrame mantığı `pandas` gerektiriyordu. Paket eksikliği uygulamanın öğretmen blueprint'ini tamamen kullanılamaz hale getiriyordu.
+
+#### 23.3. models/classroom.py — Import Düzeltildi
+
+```python
+# Önce (hatalı)
+from database import Base
+
+# Sonra (doğru — diğer modeller gibi)
+from database.session import Base, utcnow_str
+```
+
+#### 23.4. services/verification_service.py — IP Bypass Daraltıldı
+
+Branch'te tüm private ağlar (`192.168.`, `10.`, `172.`) bypass ediliyordu. Bu, aynı ağdaki herhangi bir cihazın IP doğrulamasını geçebileceği anlamına geliyordu. Orijinal davranış geri yüklendi: sadece `127.0.0.1` ve `::1` bypass edilir.
+
+#### 23.5. views/teacher.py — Dört Düzeltme
+
+1. `import pandas as pd` satırı kaldırıldı.
+2. `course_schedule` view'ındaki `pd.DataFrame` mantığı saf Python `dict` yapısıyla yeniden yazıldı.
+3. `attendance_service.resolve_suspicious(...)` → `resolve_suspicious(...)` (fonksiyon import listesine eklendi).
+4. İki yerde `print()` debug satırları kaldırıldı.
+
+#### 23.6. app.py — Debug Route Kaldırıldı
+
+```python
+# Kaldırıldı:
+@app.route('/debug-test')
+def debug_test():
+    return "Sunucu çalışıyor, rota bulundu!", 200
+```
+
+#### 23.7. templates/components/_nav.html — Rol Kontrolü Düzeltildi
+
+"Doğrulamalar" linki ve diğer sabit linkler rol kontrolü dışında herkese gösteriliyordu (debug `<!-- TEST: Her zaman göster -->` yorumuyla). Nav template tamamen yeniden düzenlendi:
+- Her rol yalnızca kendi linklerini görür (admin/öğretmen/öğrenci).
+- "Doğrulamalar" yalnızca `role == 2` (öğrenci) bloğunda görünür.
+- Debug yorumları temizlendi.
+
+#### 23.8. templates/student/dashboard.html — Geolocation Kalıcı Çözümü
+
+**Sorun:** Tarayıcılar `navigator.geolocation` API'sini yalnızca HTTPS veya `localhost` üzerinde çalıştırır. `flask run --host=0.0.0.0` ile erişildiğinde (`http://192.168.x.x:5000`) geolocation bloklanıyordu ve catch bloğu akışı tamamen durduruyordu.
+
+**Çözüm:** Üç kademeli fallback zinciri uygulandı:
+
+```
+GPS dene
+  ├── Başarılı + kampüs içi  →  doğrulama koduna geç
+  ├── Başarılı + kampüs dışı  →  network doğrulamasına geç
+  └── Kullanılamaz / reddedildi  →  network doğrulamasına geç
+
+Network doğrula (eduroam)
+  ├── Eduroam tespit edildi  →  doğrulama koduna geç
+  └── Başarısız / kullanılamaz  →  override seçeneği sun
+
+Override (şüpheli kayıt)
+  └── Öğrenci onaylarsa  →  doğrulama koduna geç (status='suspicious')
+```
+
+Ek düzeltmeler:
+- `submitAttendance` fonksiyonundaki `/session/` path'i `/student/session/` olarak düzeltildi (route prefix eksikti).
+- Override bayrağı form verisi olarak check-in endpoint'ine iletilir.
+- Geri sayım timer'ı modal kapandığında düzgünce temizlenir.
+
+#### 23.9. Doğrulama
+
+- `py_compile` tüm `.py` dosyaları için başarılı.
+- `create_app('testing')` başarılı; 55 route doğrulandı (debug-test yok).
+- `git status` — untracked dosya yok.
+
+---
+
+### Sonraki Adımlar
+
+Branch `main` ile merge edilmeye hazır. Gelecekte yapılabilecek geliştirmeler:
+- `DevicePairing` ve `LocationVerification` modellerindeki `@classmethod`'lar service katmanına taşınabilir (mimari tutarlılık için).
+- `PopularCourse` için admin CRUD arayüzü eklenebilir.
+- `Building`/`Classroom` için admin yönetim sayfası tamamlanabilir.
+- HTTPS kurulumu tamamlandığında geolocation tam doğrulama modu devreye alınabilir.
