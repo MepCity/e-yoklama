@@ -19,6 +19,87 @@
     </form>
 </div>
 
+<div class="actions-bar">
+    <button class="btn btn-primary" onclick="toggleAddStudentForm()">Yeni Öğrenci Ekle</button>
+</div>
+
+<div id="add-student-form" class="form-panel" style="display: none;">
+    <h3>Yeni Öğrenci Ekle</h3>
+    <form method="POST" action="{{ url_for('admin.add_student') }}">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Kullanıcı Adı *</label>
+                <input type="text" name="username" required>
+            </div>
+            <div class="form-group">
+                <label>E-posta *</label>
+                <input type="email" name="email" required>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Şifre *</label>
+                <input type="password" name="password" required>
+            </div>
+            <div class="form-group">
+                <label>Öğrenci Numarası *</label>
+                <input type="text" name="student_number" required>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Bölüm</label>
+                <input type="text" name="department" id="department-input" placeholder="Bölüm ara..." list="departments-list" autocomplete="off">
+                <datalist id="departments-list">
+                    <option value="Bilgisayar Mühendisliği">
+                    <option value="Yazılım Mühendisliği">
+                    <option value="Elektrik-Elektronik Mühendisliği">
+                    <option value="Makine Mühendisliği">
+                    <option value="İnşaat Mühendisliği">
+                    <option value="Endüstri Mühendisliği">
+                    <option value="Kimya Mühendisliği">
+                    <option value="Çevre Mühendisliği">
+                    <option value="Gıda Mühendisliği">
+                    <option value="Tıp">
+                    <option value="Diş Hekimliği">
+                    <option value="Eczacılık">
+                    <option value="Hemşirelik">
+                    <option value="Fizyoterapi ve Rehabilitasyon">
+                    <option value="Psikoloji">
+                    <option value="Hukuk">
+                    <option value="İşletme">
+                    <option value="İktisat">
+                    <option value="Uluslararası Ticaret ve Finans">
+                    <option value="Psikolojik Danışmanlık ve Rehberlik">
+                    <option value="Moleküler Biyoloji ve Genetik">
+                </datalist>
+            </div>
+            <div class="form-group">
+                <label>Sınıf</label>
+                <select name="class_name" required>
+                    <option value="">Seçiniz</option>
+                    <option value="Hazırlık">Hazırlık</option>
+                    <option value="1. Sınıf">1. Sınıf</option>
+                    <option value="2. Sınıf">2. Sınıf</option>
+                    <option value="3. Sınıf">3. Sınıf</option>
+                    <option value="4. Sınıf">4. Sınıf</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-success">Ekle</button>
+            <button type="button" class="btn btn-secondary" onclick="toggleAddStudentForm()">İptal</button>
+        </div>
+    </form>
+</div>
+
+<div class="actions-bar">
+    <label>
+        <input type="checkbox" id="show-inactive" onchange="toggleInactiveStudents()">
+        Pasif öğrencileri göster
+    </label>
+</div>
+
 <div class="table-responsive">
     <table>
         <thead>
@@ -28,19 +109,78 @@
                 <th>E-posta</th>
                 <th>Bölüm</th>
                 <th>Sınıf</th>
+                <th>Durum</th>
+                <th>İşlemler</th>
             </tr>
         </thead>
         <tbody>
             {% for s in students %}
-            <tr>
+            <tr class="{{ 'inactive-row' if s.is_active == 0 }}" style="{{ 'opacity: 0.6;' if s.is_active == 0 }}">
                 <td>{{ s.student_number or '-' }}</td>
                 <td>{{ s.username }}</td>
                 <td>{{ s.email }}</td>
                 <td>{{ s.department or '-' }}</td>
                 <td>{{ s.class_name or '-' }}</td>
+                <td>
+                    {% if s.is_active == 1 %}
+                        <span class="status-active">Aktif</span>
+                    {% else %}
+                        <span class="status-inactive">Pasif</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <form method="POST" action="{{ url_for('admin.toggle_student', student_id=s.id) }}" style="display: inline;">
+                        <button type="submit" class="btn btn-small {{ 'btn-danger' if s.is_active == 1 else 'btn-success' }}" 
+                                onclick="return confirm('Öğrenciyi {% if s.is_active == 1 %}pasife{% else %}aktife{% endif %} almak istediğinize emin misiniz?')">
+                            {% if s.is_active == 1 %}Pasif Yap{% else %}Aktif Yap{% endif %}
+                        </button>
+                    </form>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+<style>
+.status-active { color: #27ae60; font-weight: 600; }
+.status-inactive { color: #e74c3c; font-weight: 600; }
+.inactive-row { background-color: rgba(231, 76, 60, 0.05); }
+</style>
+
+<script>
+function toggleInactiveStudents() {
+    const showInactive = document.getElementById('show-inactive').checked;
+    const inactiveRows = document.querySelectorAll('.inactive-row');
+    
+    inactiveRows.forEach(row => {
+        row.style.display = showInactive ? '' : 'none';
+    });
+    
+    // URL parametresini güncelle
+    const url = new URL(window.location);
+    if (showInactive) {
+        url.searchParams.set('show_inactive', 'true');
+    } else {
+        url.searchParams.delete('show_inactive');
+    }
+    window.history.replaceState({}, '', url);
+}
+
+// Sayfa yüklendiğinde checkbox durumunu ayarla ve pasif öğrencileri gizle
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const showInactive = urlParams.get('show_inactive') === 'true';
+    
+    document.getElementById('show-inactive').checked = showInactive;
+    toggleInactiveStudents();
+});
+</script>
+
+<script>
+function toggleAddStudentForm() {
+    const form = document.getElementById('add-student-form');
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+</script>
 {% endblock %}

@@ -8,17 +8,66 @@
     <form method="POST" action="{{ url_for('admin.create_course') }}">
         <div class="form-row">
             <div class="form-group">
+                <label>Ders Seçimi *</label>
+                <select name="popular_course_id" id="popular-course-select" required onchange="updateCourseFromPopular()">
+                    <option value="">Popüler Ders Seçin</option>
+                    {% for course in popular_courses %}
+                    <option value="{{ course.id }}" data-department="{{ course.department }}" data-code="{{ course.course_code or '' }}" data-description="{{ course.description or '' }}">
+                        {{ course.course_name }} ({{ course.course_code or 'Kodsuz' }}) - {{ course.department }}
+                    </option>
+                    {% endfor %}
+                    <option value="custom">Özel Ders Oluştur</option>
+                </select>
+            </div>
+        </div>
+        
+        <div id="custom-course-fields" style="display: none;">
+            <div class="form-group">
                 <label>Ders Adı *</label>
-                <input type="text" name="name" required placeholder="Yazılım Mühendisliği">
+                <input type="text" name="name" id="course-name" required placeholder="Ders adını girin...">
             </div>
             <div class="form-group">
                 <label>Ders Kodu</label>
-                <input type="text" name="code" placeholder="YZM301">
+                <input type="text" name="code" id="course-code" placeholder="Ders kodunu girin...">
+            </div>
+            <div class="form-group">
+                <label>Bölüm</label>
+                <select name="department" id="department-select">
+                    <option value="">Bölüm Seçiniz</option>
+                    <option value="Bilgisayar Mühendisliği">Bilgisayar Mühendisliği</option>
+                    <option value="Yazılım Mühendisliği">Yazılım Mühendisliği</option>
+                    <option value="Elektrik-Elektronik Mühendisliği">Elektrik-Elektronik Mühendisliği</option>
+                    <option value="Makine Mühendisliği">Makine Mühendisliği</option>
+                    <option value="İnşaat Mühendisliği">İnşaat Mühendisliği</option>
+                    <option value="Endüstri Mühendisliği">Endüstri Mühendisliği</option>
+                    <option value="Kimya Mühendisliği">Kimya Mühendisliği</option>
+                    <option value="Çevre Mühendisliği">Çevre Mühendisliği</option>
+                    <option value="Gıda Mühendisliği">Gıda Mühendisliği</option>
+                    <option value="Tıp">Tıp</option>
+                    <option value="Diş Hekimliği">Diş Hekimliği</option>
+                    <option value="Eczacılık">Eczacılık</option>
+                    <option value="Hemşirelik">Hemşirelik</option>
+                    <option value="Fizyoterapi ve Rehabilitasyon">Fizyoterapi ve Rehabilitasyon</option>
+                    <option value="Psikoloji">Psikoloji</option>
+                    <option value="Hukuk">Hukuk</option>
+                    <option value="İşletme">İşletme</option>
+                    <option value="İktisat">İktisat</option>
+                    <option value="Uluslararası Ticaret ve Finans">Uluslararası Ticaret ve Finans</option>
+                    <option value="Psikolojik Danışmanlık ve Rehberlik">Psikolojik Danışmanlık ve Rehberlik</option>
+                    <option value="Moleküler Biyoloji ve Genetik">Moleküler Biyoloji ve Genetik</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Açıklama</label>
+                <input type="text" name="description" placeholder="Ders açıklaması">
             </div>
         </div>
-        <div class="form-group">
-            <label>Açıklama</label>
-            <input type="text" name="description" placeholder="Ders açıklaması">
+        
+        <div id="hidden-fields" style="display: none;">
+            <input type="hidden" name="name" id="hidden-name">
+            <input type="hidden" name="code" id="hidden-code">
+            <input type="hidden" name="department" id="hidden-department">
+            <input type="text" name="description" id="hidden-description" style="display: none;">
         </div>
         <div class="form-row">
             <div class="form-group">
@@ -30,13 +79,61 @@
                     {% endfor %}
                 </select>
             </div>
+        </div>
+        
+        <div class="form-row">
             <div class="form-group">
-                <label>Bölüm</label>
-                <input type="text" name="department" placeholder="Bilgisayar Mühendisliği">
+                <label>Derslik Binası</label>
+                <select name="building_id" id="building-select" onchange="updateClassrooms()">
+                    <option value="">Bina Seçiniz</option>
+                    {% for building in buildings %}
+                    <option value="{{ building.id }}">{{ building.building_code }} - {{ building.building_name }}</option>
+                    {% endfor %}
+                </select>
             </div>
             <div class="form-group">
-                <label>Sınıf</label>
-                <input type="text" name="class_name" placeholder="3. Sınıf">
+                <label>Derslik (Fiziksel Sınıf)</label>
+                <select name="classroom_id" id="classroom-select">
+                    <option value="">Önce Bina Seçiniz</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>Gün</label>
+                <select name="day_of_week">
+                    <option value="">Gün Seçiniz</option>
+                    <option value="1">Pazartesi</option>
+                    <option value="2">Salı</option>
+                    <option value="3">Çarşamba</option>
+                    <option value="4">Perşembe</option>
+                    <option value="5">Cuma</option>
+                    <option value="6">Cumartesi</option>
+                    <option value="7">Pazar</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Başlangıç Saati</label>
+                <input type="time" name="start_time" min="08:00" max="22:00">
+            </div>
+            <div class="form-group">
+                <label>Bitiş Saati</label>
+                <input type="time" name="end_time" min="08:00" max="22:00">
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>Sınıf (Grup)</label>
+                <select name="class_name">
+                    <option value="">Seçiniz</option>
+                    <option value="Hazırlık">Hazırlık</option>
+                    <option value="1. Sınıf">1. Sınıf</option>
+                    <option value="2. Sınıf">2. Sınıf</option>
+                    <option value="3. Sınıf">3. Sınıf</option>
+                    <option value="4. Sınıf">4. Sınıf</option>
+                </select>
             </div>
         </div>
         <button type="submit" class="btn btn-primary">Ders Oluştur</button>
@@ -66,6 +163,13 @@
     </form>
 </div>
 
+<div class="actions-bar">
+    <label>
+        <input type="checkbox" id="show-inactive-courses" onchange="toggleInactiveCourses()">
+        Pasif dersleri göster
+    </label>
+</div>
+
 <h2>Mevcut Dersler</h2>
 <div class="table-responsive">
     <table>
@@ -75,18 +179,196 @@
                 <th>Ders Adı</th>
                 <th>Öğretmen</th>
                 <th>Bölüm</th>
+                <th>Sınıf</th>
+                <th>Derslik</th>
+                <th>Zaman</th>
+                <th>Durum</th>
+                <th>İşlemler</th>
             </tr>
         </thead>
         <tbody>
             {% for c in courses %}
-            <tr>
+            <tr class="{{ 'inactive-row' if c.is_active == 0 }}" style="{{ 'opacity: 0.6;' if c.is_active == 0 }}">
                 <td>{{ c.code or '-' }}</td>
                 <td>{{ c.name }}</td>
                 <td>{{ c.teacher.username if c.teacher else '-' }}</td>
                 <td>{{ c.department or '-' }}</td>
+                <td>{{ c.class_name or '-' }}</td>
+                <td>
+                    {% if c.building_id and c.classroom_id %}
+                        {% set classroom = c.classrooms.filter_by(id=c.classroom_id).first() %}
+                        {% if classroom %}
+                            {{ classroom.classroom_code }} ({{ classroom.building.building_code if classroom.building else '-' }})
+                        {% else %}
+                            {{ c.classroom_id or '-' }}
+                        {% endif %}
+                    {% else %}
+                        {{ '-' }}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if c.day_of_week and c.start_time and c.end_time %}
+                        {% set days = ['', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'] %}
+                        {{ days[c.day_of_week] }} {{ c.start_time }}-{{ c.end_time }}
+                    {% else %}
+                        {{ '-' }}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if c.is_active == 1 %}
+                        <span class="status-active">Aktif</span>
+                    {% else %}
+                        <span class="status-inactive">Pasif</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <form method="POST" action="{{ url_for('admin.toggle_course', course_id=c.id) }}" style="display: inline;">
+                        <button type="submit" class="btn btn-small {{ 'btn-danger' if c.is_active == 1 else 'btn-success' }}" 
+                                onclick="return confirm('Dersi {% if c.is_active == 1 %}pasife{% else %}aktife{% endif %} almak istediğinize emin misiniz?')">
+                            {% if c.is_active == 1 %}Pasif Yap{% else %}Aktif Yap{% endif %}
+                        </button>
+                    </form>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+<style>
+.status-active { color: #27ae60; font-weight: 600; }
+.status-inactive { color: #e74c3c; font-weight: 600; }
+.inactive-row { background-color: rgba(231, 76, 60, 0.05); }
+</style>
+
+<script>
+function toggleInactiveCourses() {
+    const showInactive = document.getElementById('show-inactive-courses').checked;
+    const inactiveRows = document.querySelectorAll('.inactive-row');
+    
+    inactiveRows.forEach(row => {
+        row.style.display = showInactive ? '' : 'none';
+    });
+    
+    // URL parametresini güncelle
+    const url = new URL(window.location);
+    if (showInactive) {
+        url.searchParams.set('show_inactive', 'true');
+    } else {
+        url.searchParams.delete('show_inactive');
+    }
+    window.history.replaceState({}, '', url);
+}
+
+// Sayfa yüklendiğinde checkbox durumunu ayarla ve pasif dersleri gizle
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const showInactive = urlParams.get('show_inactive') === 'true';
+    
+    document.getElementById('show-inactive-courses').checked = showInactive;
+    toggleInactiveCourses();
+});
+</script>
+
+<script>
+function updateCourseFromPopular() {
+    const select = document.getElementById('popular-course-select');
+    const customFields = document.getElementById('custom-course-fields');
+    const hiddenFields = document.getElementById('hidden-fields');
+    const selectedOption = select.options[select.selectedIndex];
+    
+    if (select.value === 'custom') {
+        // Özel ders oluştur
+        customFields.style.display = 'block';
+        hiddenFields.style.display = 'none';
+        
+        // Gizli alanları temizle
+        document.getElementById('hidden-name').value = '';
+        document.getElementById('hidden-code').value = '';
+        document.getElementById('hidden-department').value = '';
+        document.getElementById('hidden-description').value = '';
+    } else if (select.value) {
+        // Popüler ders seçildi
+        customFields.style.display = 'none';
+        hiddenFields.style.display = 'block';
+        
+        // Gizli alanları doldur
+        document.getElementById('hidden-name').value = selectedOption.textContent.split(' (')[0];
+        document.getElementById('hidden-code').value = selectedOption.getAttribute('data-code') || '';
+        document.getElementById('hidden-department').value = selectedOption.getAttribute('data-department') || '';
+        document.getElementById('hidden-description').value = selectedOption.getAttribute('data-description') || '';
+        
+        // Öğretmen listesini bölüme göre filtrele
+        filterTeachersByDepartment(selectedOption.getAttribute('data-department'));
+    } else {
+        // Seçim yapılmadı
+        customFields.style.display = 'none';
+        hiddenFields.style.display = 'none';
+    }
+}
+
+function filterTeachersByDepartment(department) {
+    const teacherSelect = document.querySelector('select[name="teacher_id"]');
+    const teachers = [
+        {% for t in teachers %}
+        { id: {{ t.id }}, username: "{{ t.username }}", branch: "{{ t.branch or '' }}" },
+        {% endfor %}
+    ];
+    
+    // Mevcut seçimi sakla
+    const currentSelection = teacherSelect.value;
+    
+    // Listeyi temizle
+    teacherSelect.innerHTML = '<option value="">Seçiniz</option>';
+    
+    // Öğretmenleri ekle
+    teachers.forEach(teacher => {
+        // Eğer bölüm belirtilmişse, sadece o bölümdeki öğretmenleri göster
+        if (!department || !teacher.branch || teacher.branch === department) {
+            const option = document.createElement('option');
+            option.value = teacher.id;
+            option.textContent = `${teacher.username} (${teacher.branch || '-'})`;
+            teacherSelect.appendChild(option);
+        }
+    });
+    
+    // Önceki seçimi geri yükle (hala mevcutsa)
+    if (currentSelection) {
+        teacherSelect.value = currentSelection;
+    }
+}
+
+function updateClassrooms() {
+    const buildingSelect = document.getElementById('building-select');
+    const classroomSelect = document.getElementById('classroom-select');
+    const selectedBuildingId = buildingSelect.value;
+    
+    if (!selectedBuildingId) {
+        classroomSelect.innerHTML = '<option value="">Önce Bina Seçiniz</option>';
+        return;
+    }
+    
+    // Binalara göre sınıfları filtrele
+    const classrooms = [
+        {% for classroom in classrooms %}
+        { id: {{ classroom.id }}, building_id: {{ classroom.building_id }}, code: "{{ classroom.classroom_code }}", name: "{{ classroom.classroom_code }} - {{ classroom.classroom_name }}" },
+        {% endfor %}
+    ];
+    
+    const filteredClassrooms = classrooms.filter(room => room.building_id == selectedBuildingId);
+    
+    classroomSelect.innerHTML = '<option value="">Sınıf Seçiniz</option>';
+    filteredClassrooms.forEach(room => {
+        const option = document.createElement('option');
+        option.value = room.id;
+        option.textContent = room.name;
+        classroomSelect.appendChild(option);
+    });
+}
+
+// Sayfa yüklendiğinde form durumunu ayarla
+document.addEventListener('DOMContentLoaded', function() {
+    updateCourseFromPopular();
+});
+</script>
 {% endblock %}

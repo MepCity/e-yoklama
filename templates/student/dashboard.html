@@ -15,25 +15,8 @@
             {% if active.id in checked_in_sessions %}
             <p class="status-verified">Bu yoklama oturumuna katıldınız.</p>
             {% else %}
-            <form method="POST" action="{{ url_for('student.check_in', session_id=active.id) }}" class="check-in-form" data-offline-attendance="1">
-                <label for="code-{{ active.id }}">Yoklama Kodu</label>
-                <input type="hidden" name="session_id" value="{{ active.id }}">
-                <input type="hidden" name="latitude" class="gps-latitude">
-                <input type="hidden" name="longitude" class="gps-longitude">
-                <div class="form-inline">
-                    <div class="form-group">
-                        <input id="code-{{ active.id }}" type="text" name="code" required maxlength="20" placeholder="Kodu girin">
-                    </div>
-                    <button type="submit" class="btn btn-primary">Yoklama Ver</button>
-                </div>
-                <label class="checkbox-label">
-                    <input type="checkbox" name="override" value="1">
-                    Doğrulama başarısız olursa yine de devam et
-                </label>
-                <input type="text" name="override_reason" placeholder="Açıklama (opsiyonel)">
+            <button type="button" class="btn btn-primary check-in-btn" data-session-id="{{ active.id }}" data-requires-pairing="true">🎯 Yoklamaya Gir</button>
                 <p class="qr-hint">Kod geçerlilik zamanı: {{ active.code_expires_at }}</p>
-                <p class="qr-hint gps-status">Konum bilgisi bekleniyor.</p>
-            </form>
             {% endif %}
         </div>
         {% endif %}
@@ -45,43 +28,360 @@
 {% endif %}
 {% endblock %}
 
+<!-- Doğrulama Modal -->
+<div id="verificationModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>🎯 Yoklama Doğrulaması</h3>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div id="verificationSteps">
+                <div class="step" id="step1">
+                    <h4>Adım 1: Konum Doğrulama</h4>
+                    <p>Önce konumunuzu doğrulamanız gerekiyor.</p>
+                    <button id="startVerificationBtn" class="btn btn-primary">Doğrulamayı Başlat</button>
+                </div>
+                
+                <div class="step hidden" id="step2">
+                    <h4>Adım 2: Yoklama Kodu</h4>
+                    <p>Doğrulama başarılı! Lütfen yoklama kodunu girin veya QR kodu okutun.</p>
+                    <div class="verification-code">
+                        <div id="currentCode" class="code-display">----</div>
+                        <div class="code-timer">
+                            <span>Kalan süre: </span>
+                            <span id="countdown">60</span>
+                            <span> saniye</span>
+                        </div>
+                    </div>
+                    <div class="verification-methods">
+                        <div class="method-input">
+                            <input type="text" id="codeInput" placeholder="Yoklama kodunu girin..." maxlength="6">
+                            <button id="submitCodeBtn" class="btn btn-primary">Kodu Gir</button>
+                        </div>
+                        <div class="method-qr">
+                            <button id="scanQRBtn" class="btn btn-info">📷 QR Kod Okut</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 10% auto;
+    padding: 0;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px 12px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.close {
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.close:hover {
+    opacity: 1;
+}
+
+.modal-body {
+    padding: 30px;
+}
+
+.step {
+    text-align: center;
+}
+
+.step.hidden {
+    display: none;
+}
+
+.verification-code {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.code-display {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #2c3e50;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 8px;
+    margin-bottom: 10px;
+}
+
+.code-timer {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.verification-methods {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.method-input, .method-qr {
+    text-align: center;
+}
+
+.method-input input {
+    width: 100%;
+    padding: 12px;
+    font-size: 1.2rem;
+    text-align: center;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+
+@media (max-width: 768px) {
+    .verification-methods {
+        grid-template-columns: 1fr;
+    }
+    
+    .modal-content {
+        margin: 20% auto;
+        width: 95%;
+    }
+}
+</style>
+
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    var forms = document.querySelectorAll('.check-in-form');
-    if (!forms.length) {
-        return;
+    // Modal işlemleri
+    const modal = document.getElementById('verificationModal');
+    const closeBtn = modal.querySelector('.close');
+    let currentSessionId = null;
+    
+    closeBtn.onclick = function() {
+        modal.style.display = 'none';
+    };
+    
+    window.onclick = function(event) {
+        if (event.target == modal) {
+            modal.style.display = 'none';
+        }
+    };
+    
+    // Yoklamaya Gir butonları
+    document.querySelectorAll('.check-in-btn').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            currentSessionId = this.getAttribute('data-session-id');
+            
+            // Cihaz eşleme kontrolü
+            if (this.getAttribute('data-requires-pairing') === 'true') {
+                try {
+                    const response = await fetch('/student/api/check-device-pairing');
+                    const result = await response.json();
+                    
+                    if (!result.has_pairing) {
+                        alert('Yoklamaya katılmak için önce cihaz eşlemesi yapmanız gerekiyor. Doğrulamalar sayfasına gidin.');
+                        return;
+                    }
+                } catch (error) {
+                    alert('Cihaz eşleme durumu kontrol edilemedi. Lütfen sayfayı yenileyin.');
+                    return;
+                }
+            }
+            
+            modal.style.display = 'block';
+            showStep(1);
+        });
+    });
+    
+    // Doğrulama adımları
+    function showStep(stepNumber) {
+        document.querySelectorAll('.step').forEach(step => {
+            step.classList.add('hidden');
+        });
+        document.getElementById('step' + stepNumber).classList.remove('hidden');
     }
-    if (!navigator.geolocation) {
-        forms.forEach(function (form) {
-            var status = form.querySelector('.gps-status');
-            if (status) {
-                status.textContent = 'Tarayıcınız konum bilgisini desteklemiyor.';
+    
+    // Doğrulamayı başlat
+    document.getElementById('startVerificationBtn').addEventListener('click', async function() {
+        try {
+            // Konum izni iste
+            const position = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject);
+            });
+            
+            // Konum doğrulama
+            const response = await fetch('/student/api/verify-location', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.in_campus) {
+                // GPS başarılı, kodu başlat
+                await startVerificationCode();
+            } else {
+                // GPS başarısız, ağ kontrolü
+                const networkInfo = {
+                    ssid: 'unknown', // Gerçek uygulamada WiFi API ile alınır
+                    network_type: 'wifi'
+                };
+                
+                const networkResponse = await fetch('/student/api/verify-network', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(networkInfo)
+                });
+                const networkResult = await networkResponse.json();
+                
+                if (networkResult.is_eduroam) {
+                    await startVerificationCode();
+                } else {
+                    // Manuel doğrulama
+                    if (confirm('Otomatik doğrulama başarısız oldu. Şüpheli olarak devam etmek istiyor musunuz?')) {
+                        await startVerificationCode();
+                    } else {
+                        modal.style.display = 'none';
+                    }
+                }
             }
-        });
-        return;
+            
+        } catch (error) {
+            alert('Doğrulama sırasında hata: ' + error.message);
+        }
+    });
+    
+    // Doğrulama kodunu başlat
+    async function startVerificationCode() {
+        try {
+            const response = await fetch('/student/api/start-verification');
+            const result = await response.json();
+            
+            if (result.success) {
+                document.getElementById('currentCode').textContent = result.code;
+                showStep(2);
+                startCountdown(60);
+            } else {
+                alert('Doğrulama başlatılamadı: ' + result.message);
+            }
+        } catch (error) {
+            alert('Doğrulama başlatılamadı: ' + error.message);
+        }
     }
-
-    navigator.geolocation.getCurrentPosition(function (position) {
-        forms.forEach(function (form) {
-            form.querySelector('.gps-latitude').value = position.coords.latitude;
-            form.querySelector('.gps-longitude').value = position.coords.longitude;
-            var status = form.querySelector('.gps-status');
-            if (status) {
-                status.textContent = 'Konum bilgisi alındı.';
+    
+    // Geri sayım
+    function startCountdown(seconds) {
+        let remaining = seconds;
+        const countdownElement = document.getElementById('countdown');
+        
+        const timer = setInterval(() => {
+            remaining--;
+            countdownElement.textContent = remaining;
+            
+            if (remaining <= 0) {
+                clearInterval(timer);
+                modal.style.display = 'none';
+                alert('Doğrulama süresi doldu!');
             }
-        });
-    }, function () {
-        forms.forEach(function (form) {
-            var status = form.querySelector('.gps-status');
-            if (status) {
-                status.textContent = 'Konum izni verilmedi. Gerekirse yine de devam seçeneğini kullanın.';
+        }, 1000);
+    }
+    
+    // Kod gönderme
+    document.getElementById('submitCodeBtn').addEventListener('click', async function() {
+        const code = document.getElementById('codeInput').value;
+        
+        try {
+            const response = await fetch('/student/api/submit-verification', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ code: code })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // Yoklamaya gir
+                await submitAttendance(currentSessionId, code);
+                modal.style.display = 'none';
+                location.reload();
+            } else {
+                alert('Doğrulama başarısız: ' + result.message);
             }
-        });
-    }, {
-        enableHighAccuracy: true,
-        timeout: 5000,
-        maximumAge: 30000
+        } catch (error) {
+            alert('Doğrulama sırasında hata: ' + error.message);
+        }
+    });
+    
+    // Yoklamayı gönder
+    async function submitAttendance(sessionId, code) {
+        try {
+            const formData = new FormData();
+            formData.append('session_id', sessionId);
+            formData.append('code', code);
+            
+            const response = await fetch(`/session/${sessionId}/check-in`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.text();
+            
+            if (response.ok) {
+                alert('Yoklamaya başarıyla katıldınız!');
+            } else {
+                alert('Yoklama hatası: ' + result);
+            }
+        } catch (error) {
+            alert('Yoklama sırasında hata: ' + error.message);
+        }
+    });
+    
+    // QR tarama (basit implementasyon)
+    document.getElementById('scanQRBtn').addEventListener('click', function() {
+        alert('QR tarama özelliği tarayıcı desteği gerektirir. Lütfen kodu manuel olarak girin.');
     });
 });
 </script>

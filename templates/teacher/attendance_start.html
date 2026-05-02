@@ -1,0 +1,412 @@
+{% extends 'base.html' %}
+{% block title %}Yoklama Başlat — E-Yoklama{% endblock %}
+{% block content %}
+<h1>Yoklama Başlat</h1>
+
+<div class="page-header">
+    <p>Yoklama başlatmak için QR yenileme süresini belirleyin.</p>
+    <a href="{{ url_for('teacher.dashboard') }}" class="btn btn-secondary">← Panele Dön</a>
+</div>
+
+{% if courses_data %}
+<div class="attendance-setup">
+    {% if not preselected_course %}
+    <div class="course-selection">
+        <h3>📚 Ders Seçimi</h3>
+        <div class="courses-grid">
+            {% for course_data in courses_data %}
+            <div class="course-card selectable" onclick="selectCourse({{ course_data.course.id }}, '{{ course_data.course.name }}', '{{ course_data.course.code or 'Kodsuz' }}')">
+                <div class="course-header">
+                    <h3>{{ course_data.course.name }}</h3>
+                    <p class="course-code">{{ course_data.course.code or 'Kodsuz' }}</p>
+                    <p class="course-department">{{ course_data.course.department or '-' }}</p>
+                </div>
+                
+                <div class="course-status">
+                    {% if course_data.active_session %}
+                    <div class="status-active">
+                        <span class="status-icon">🟢</span>
+                        <span>Aktif Yoklama Var</span>
+                    </div>
+                    {% else %}
+                    <div class="status-inactive">
+                        <span class="status-icon">⚪</span>
+                        <span>Yoklama Başlatılabilir</span>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                {% if course_data.active_session %}
+                <div class="active-session-link">
+                    <a href="{{ url_for('teacher.active_session', session_id=course_data.active_session.id) }}" class="btn btn-small btn-primary">Oturuma Git</a>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="qr-settings{% if not preselected_course %} hidden{% endif %}" id="qr-settings">
+        <h3>⚙️ QR Ayarları</h3>
+        <div class="selected-course-info">
+            {% if preselected_course and courses_data[0] %}
+            <h4>{{ courses_data[0].course.name }}</h4>
+            <p>{{ courses_data[0].course.code or 'Kodsuz' }}</p>
+            {% else %}
+            <h4 id="selected-course-name">-</h4>
+            <p id="selected-course-code">-</p>
+            {% endif %}
+        </div>
+        
+        <form method="POST" action="#" id="attendance-form" onsubmit="return setFormAction(event)">
+            <input type="hidden" name="course_id" id="hidden-course-id" value="{% if preselected_course and courses_data[0] %}{{ courses_data[0].course.id }}{% endif %}">
+            
+            <div class="setting-group">
+                <label>QR Yenileme Süresi (saniye)</label>
+                <input type="number" name="refresh_seconds" value="3" min="1" max="60" class="form-control">
+                <small>1-60 saniye arası</small>
+            </div>
+            
+            <div class="form-actions">
+                {% if not preselected_course %}
+                <button type="button" onclick="goBack()" class="btn btn-secondary">← Geri</button>
+                {% endif %}
+                <button type="submit" class="btn btn-success btn-large">
+                    🚀 Yoklamayı Başlat
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% else %}
+<div class="no-courses">
+    <div class="card">
+        <h3>📚 Ders Bulunamadı</h3>
+        <p>Size atanmış aktif ders bulunmamaktadır.</p>
+        <p>Lütfen sistem yöneticisi ile iletişime geçin.</p>
+    </div>
+</div>
+{% endif %}
+
+<script>
+// Ders verisi
+const coursesData = {{ courses_data|tojson }};
+let selectedCourse = null;
+
+// Ders seçimi
+function selectCourse(courseId, courseName, courseCode) {
+    selectedCourse = coursesData.find(c => c.course.id === courseId);
+    
+    if (selectedCourse && selectedCourse.active_session) {
+        // Aktif oturumu olan ders için yönlendirme
+        window.location.href = `/teacher/active-session/${selectedCourse.active_session.id}`;
+        return;
+    }
+    
+    // Seçilen ders bilgilerini güncelle
+    document.getElementById('selected-course-name').textContent = courseName;
+    document.getElementById('selected-course-code').textContent = courseCode;
+    document.getElementById('hidden-course-id').value = courseId;
+    
+    // QR ayarları bölümünü göster
+    document.querySelector('.course-selection').classList.add('hidden');
+    document.getElementById('qr-settings').classList.remove('hidden');
+}
+
+// Geri dön
+function goBack() {
+    document.querySelector('.course-selection').classList.remove('hidden');
+    document.getElementById('qr-settings').classList.add('hidden');
+    selectedCourse = null;
+}
+
+// Form action'ını ayarlama
+function setFormAction(event) {
+    const courseId = document.getElementById('hidden-course-id').value;
+    if (!courseId) {
+        event.preventDefault();
+        alert('Ders seçilmedi. Lütfen tekrar deneyin.');
+        goBack();
+        return false;
+    }
+    
+    // Form action'ını dinamik olarak ayarla
+    const form = document.getElementById('attendance-form');
+    form.action = `/teacher/course/${courseId}/start-session`;
+    
+    return true;
+}
+
+// Form gönderimi
+document.getElementById('attendance-form').addEventListener('submit', function(e) {
+    return setFormAction(e);
+});
+</script>
+
+<style>
+.page-header {
+    margin-bottom: 30px;
+}
+
+.page-header p {
+    color: #666;
+    margin-bottom: 15px;
+}
+
+/* Ana Konteyner */
+.attendance-setup {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.course-selection, .qr-settings {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.course-selection.hidden, .qr-settings.hidden {
+    display: none;
+}
+
+.course-selection h3, .qr-settings h3 {
+    margin-top: 0;
+    margin-bottom: 25px;
+    color: #2c3e50;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Ders Kartları */
+.courses-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 20px;
+}
+
+.course-card {
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.course-card.selectable:hover {
+    border-color: #3498db;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(52, 152, 219, 0.2);
+}
+
+.course-card.selectable:active {
+    transform: translateY(0);
+}
+
+.course-header h3 {
+    margin: 0 0 5px 0;
+    color: #2c3e50;
+    font-size: 1.2em;
+}
+
+.course-code {
+    font-weight: 600;
+    color: #3498db;
+    margin: 0 0 5px 0;
+}
+
+.course-department {
+    color: #7f8c8d;
+    margin: 0 0 15px 0;
+    font-size: 0.9em;
+}
+
+.course-status {
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.status-active {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-inactive {
+    background: #f8f9fa;
+    color: #6c757d;
+    border: 1px solid #dee2e6;
+}
+
+.status-icon {
+    margin-right: 8px;
+    font-size: 1.1em;
+}
+
+.active-session-link {
+    text-align: center;
+}
+
+/* Seçili Ders Bilgileri */
+.selected-course-info {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 25px;
+    border-left: 4px solid #3498db;
+}
+
+.selected-course-info h4 {
+    margin: 0 0 5px 0;
+    color: #2c3e50;
+}
+
+.selected-course-info p {
+    margin: 0;
+    color: #666;
+}
+
+/* Form Ayarları */
+.setting-group {
+    margin-bottom: 25px;
+}
+
+.setting-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.form-control {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.2s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.setting-group small {
+    display: block;
+    margin-top: 5px;
+    color: #6c757d;
+    font-size: 0.8em;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    padding-top: 20px;
+    border-top: 1px solid #e9ecef;
+}
+
+.btn-large {
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+/* Butonlar */
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: #3498db;
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #2980b9;
+}
+
+.btn-success {
+    background: #27ae60;
+    color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+    background: #229954;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: #5a6268;
+}
+
+.btn-small {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+/* Boş Durum */
+.no-courses {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.no-courses .card {
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 30px;
+    text-align: center;
+}
+
+.no-courses h3 {
+    color: #e74c3c;
+    margin-bottom: 15px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .courses-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .course-selection, .qr-settings {
+        padding: 20px;
+    }
+}
+</style>
+{% endblock %}

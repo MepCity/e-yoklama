@@ -39,6 +39,8 @@ class User(Base):
         back_populates='reviewer',
         lazy='dynamic',
     )
+    device_pairings = relationship('DevicePairing', back_populates='user', lazy='dynamic')
+    location_verifications = relationship('LocationVerification', back_populates='user', lazy='dynamic')
 
     def to_dict(self):
         return {

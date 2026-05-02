@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}Ders Programı — E-Yoklama{% endblock %}
+{% block content %}
+<h1>Ders Programı</h1>
+
+<div class="card">
+    <h3>Ders Programı Ekle</h3>
+    <form method="POST" action="{{ url_for('admin.add_schedule') }}">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Ders *</label>
+                <select name="course_id" required>
+                    <option value="">Seçiniz</option>
+                    {% for c in courses %}
+                    <option value="{{ c.id }}">{{ c.name }} ({{ c.code or '-' }}) - {{ c.teacher.username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Gün *</label>
+                <select name="day_of_week" required>
+                    <option value="">Seçiniz</option>
+                    <option value="0">Pazartesi</option>
+                    <option value="1">Salı</option>
+                    <option value="2">Çarşamba</option>
+                    <option value="3">Perşembe</option>
+                    <option value="4">Cuma</option>
+                    <option value="5">Cumartesi</option>
+                    <option value="6">Pazar</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Başlangıç Saati *</label>
+                <input type="time" name="start_time" required>
+            </div>
+            <div class="form-group">
+                <label>Bitiş Saati *</label>
+                <input type="time" name="end_time" required>
+            </div>
+            <div class="form-group">
+                <label>Sınıf *</label>
+                <input type="text" name="room" required placeholder="Örn: D-301">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Ders Programı Ekle</button>
+    </form>
+</div>
+
+<h2>Mevcut Ders Programı</h2>
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>Ders</th>
+                <th>Öğretmen</th>
+                <th>Gün</th>
+                <th>Saat</th>
+                <th>Sınıf</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in schedules %}
+            <tr>
+                <td>{{ s.course.name }} ({{ s.course.code or '-' }})</td>
+                <td>{{ s.course.teacher.username }}</td>
+                <td>{{ day_name(s.day_of_week) }}</td>
+                <td>{{ s.start_time }} - {{ s.end_time }}</td>
+                <td>{{ s.room or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

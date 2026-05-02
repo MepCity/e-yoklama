@@ -57,3 +57,8 @@ def format_percentage(value):
     if value is None:
         return '%0'
     return f'%{value:.1f}'
+
+
+def utcnow_str():
+    """UTC zamanı string olarak döndürür"""
+    return datetime.utcnow().isoformat()

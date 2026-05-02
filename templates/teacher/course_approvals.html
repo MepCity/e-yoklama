@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% block title %}Ders Onayları — E-Yoklama{% endblock %}
+{% block content %}
+<h1>Ders Onayları</h1>
+
+<div class="card">
+    <h3>Onay Bekleyen Dersler</h3>
+    {% if pending_courses %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Ders Kodu</th>
+                        <th>Ders Adı</th>
+                        <th>Bölüm</th>
+                        <th>Sınıf</th>
+                        <th>İşlemler</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for course in pending_courses %}
+                    <tr>
+                        <td>{{ course.code or '-' }}</td>
+                        <td>{{ course.name }}</td>
+                        <td>{{ course.department or '-' }}</td>
+                        <td>{{ course.class_name or '-' }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('teacher.approve_course', course_id=course.id) }}" style="display: inline;">
+                                <button type="submit" name="action" value="approve" class="btn btn-success btn-small" 
+                                        onclick="return confirm('{{ course.name }} dersini onaylamak istediğinize emin misiniz?')">
+                                    Onayla
+                                </button>
+                                <button type="submit" name="action" value="reject" class="btn btn-danger btn-small"
+                                        onclick="return confirm('{{ course.name }} dersini reddetmek istediğinize emin misiniz?')">
+                                    Reddet
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p>Onay bekleyen ders bulunmuyor.</p>
+    {% endif %}
+</div>
+
+{% if approved_courses %}
+<div class="card">
+    <h3>Onaylanan Dersler</h3>
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Ders Kodu</th>
+                    <th>Ders Adı</th>
+                    <th>Bölüm</th>
+                    <th>Sınıf</th>
+                    <th>Durum</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for course in approved_courses %}
+                <tr>
+                    <td>{{ course.code or '-' }}</td>
+                    <td>{{ course.name }}</td>
+                    <td>{{ course.department or '-' }}</td>
+                    <td>{{ course.class_name or '-' }}</td>
+                    <td><span class="status-approved">Onaylandı</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if rejected_courses %}
+<div class="card">
+    <h3>Reddedilen Dersler</h3>
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Ders Kodu</th>
+                    <th>Ders Adı</th>
+                    <th>Bölüm</th>
+                    <th>Sınıf</th>
+                    <th>Durum</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for course in rejected_courses %}
+                <tr>
+                    <td>{{ course.code or '-' }}</td>
+                    <td>{{ course.name }}</td>
+                    <td>{{ course.department or '-' }}</td>
+                    <td>{{ course.class_name or '-' }}</td>
+                    <td><span class="status-rejected">Reddedildi</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

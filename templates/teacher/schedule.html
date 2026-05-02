@@ -3,6 +3,7 @@
 {% block content %}
 <h1>{{ course.name }} <small>({{ course.code or '' }})</small></h1>
 
+{% if session.user.role_id == 0 %}
 <div class="card">
     <h3>Yeni Ders Saati Ekle</h3>
     <form method="POST">
@@ -29,37 +30,60 @@
                 <input type="time" name="end_time" required>
             </div>
             <div class="form-group">
-                <label>Derslik</label>
-                <input type="text" name="room" placeholder="A-301">
+                <label>Sınıf</label>
+                <input type="text" name="room" placeholder="Örn: 101">
             </div>
         </div>
-        <button type="submit" class="btn btn-primary">Ekle</button>
+        <button type="submit" class="btn btn-primary">Ders Saati Ekle</button>
     </form>
 </div>
+{% else %}
+<div class="card">
+    <h3>📅 Ders Programı</h3>
+    <p>Bu dersin programı sadece yönetici tarafından düzenlenebilir.</p>
+    <p>Program değişikliği için lütfen sistem yöneticisi ile iletişime geçin.</p>
+</div>
+{% endif %}
 
-<h2>Mevcut Program</h2>
-{% if schedules %}
-<div class="table-responsive">
-    <table>
-        <thead>
-            <tr>
-                <th>Gün</th>
-                <th>Başlangıç</th>
-                <th>Bitiş</th>
-                <th>Derslik</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for s in schedules %}
-            <tr>
-                <td>{{ day_name(s.day_of_week) }}</td>
-                <td>{{ s.start_time }}</td>
-                <td>{{ s.end_time }}</td>
-                <td>{{ s.room or '-' }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<h2>Ders Programı</h2>
+{% if schedule_data %}
+<div class="schedule-container">
+    <div class="schedule-table-wrapper">
+        <table class="schedule-table">
+            <thead>
+                <tr>
+                    <th class="time-column">Saat</th>
+                    <th>Pazartesi</th>
+                    <th>Salı</th>
+                    <th>Çarşamba</th>
+                    <th>Perşembe</th>
+                    <th>Cuma</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for time_slot, row_data in schedule_data.items() %}
+                <tr>
+                    <td class="time-slot">{{ time_slot }}</td>
+                    {% for day, course_codes in row_data.items() %}
+                    {% if course_codes %}
+                    <td class="course-cell" style="background-color: #3498db;">
+                        <div class="course-info">
+                            {% set codes = course_codes.split(', ') %}
+                            {% for code in codes %}
+                            <strong>{{ code }}</strong>
+                            {% if not loop.last %}<br>{% endif %}
+                            {% endfor %}
+                        </div>
+                    </td>
+                    {% else %}
+                    <td class="empty-cell"></td>
+                    {% endif %}
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% else %}
 <p>Henüz ders saati eklenmemiş.</p>
@@ -89,15 +113,122 @@
                 <label>Kod Yenileme Süresi (sn)</label>
                 <input type="number" name="refresh_seconds" value="10" min="5" max="30">
             </div>
-            <div class="form-group">
-                <label>IP Filtresi</label>
-                <input type="text" name="allowed_ip_prefix" placeholder="192.168.">
-            </div>
-        </div>
+                    </div>
         <button type="submit" class="btn btn-primary">Yoklamayı Başlat</button>
     </form>
 </div>
 {% endif %}
 
-<a href="{{ url_for('teacher.dashboard') }}" class="btn">Geri Dön</a>
+<div class="actions-bar">
+    <a href="{{ url_for('teacher.dashboard') }}" class="btn btn-secondary">Derslere Dön</a>
+    {% if course %}
+    <a href="{{ url_for('teacher.statistics', course_id=course.id) }}" class="btn btn-info">İstatistikleri Gör</a>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.actions-bar {
+    margin: 20px 0;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.schedule-container {
+    margin: 20px 0;
+    overflow-x: auto;
+}
+
+.schedule-table-wrapper {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.schedule-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.schedule-table th {
+    background: #f8f9fa;
+    padding: 10px 5px;
+    text-align: center;
+    font-weight: 600;
+    color: #2c3e50;
+    border: 1px solid #dee2e6;
+    white-space: nowrap;
+}
+
+.schedule-table td {
+    padding: 8px 5px;
+    text-align: center;
+    border: 1px solid #dee2e6;
+    vertical-align: top;
+    min-width: 80px;
+    height: 40px;
+}
+
+.time-column {
+    background: #e9ecef !important;
+    font-weight: 600;
+    min-width: 60px;
+}
+
+.time-slot {
+    font-size: 11px;
+    color: #495057;
+}
+
+.empty-cell {
+    background: #fafafa;
+}
+
+.course-cell {
+    position: relative;
+}
+
+.course-info {
+    font-size: 10px;
+    line-height: 1.2;
+    color: white;
+    text-align: left;
+    padding: 2px;
+}
+
+.course-info strong {
+    display: block;
+    font-size: 10px;
+    margin-bottom: 1px;
+}
+
+.course-info small {
+    display: block;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .schedule-table {
+        font-size: 10px;
+    }
+    
+    .schedule-table th,
+    .schedule-table td {
+        padding: 5px 2px;
+        min-width: 60px;
+    }
+    
+    .course-info {
+        font-size: 8px;
+    }
+    
+    .course-info strong {
+        font-size: 9px;
+    }
+}
+</style>
 {% endblock %}

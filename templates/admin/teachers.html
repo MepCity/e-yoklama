@@ -22,6 +22,13 @@
     </form>
 </div>
 
+<div class="actions-bar">
+    <label>
+        <input type="checkbox" id="show-inactive-teachers" onchange="toggleInactiveTeachers()">
+        Pasif öğretmenleri göster
+    </label>
+</div>
+
 <div class="table-responsive">
     <table>
         <thead>
@@ -30,18 +37,73 @@
                 <th>Kullanıcı Adı</th>
                 <th>E-posta</th>
                 <th>Branş</th>
+                <th>Durum</th>
+                <th>İşlemler</th>
             </tr>
         </thead>
         <tbody>
             {% for t in teachers %}
-            <tr>
+            <tr class="{{ 'inactive-row' if t.is_active == 0 }}" style="{{ 'opacity: 0.6;' if t.is_active == 0 }}">
                 <td>{{ t.id }}</td>
                 <td>{{ t.username }}</td>
                 <td>{{ t.email }}</td>
                 <td>{{ t.branch or '-' }}</td>
+                <td>
+                    {% if t.is_active == 1 %}
+                        <span class="status-active">Aktif</span>
+                    {% else %}
+                        <span class="status-inactive">Pasif</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <form method="POST" action="{{ url_for('admin.toggle_teacher', teacher_id=t.id) }}" style="display: inline;">
+                        <button type="submit" class="btn btn-small {{ 'btn-danger' if t.is_active == 1 else 'btn-success' }}" 
+                                onclick="return confirm('Öğretmeni {% if t.is_active == 1 %}pasife{% else %}aktife{% endif %} almak istediğinize emin misiniz?')">
+                            {% if t.is_active == 1 %}Pasif Yap{% else %}Aktif Yap{% endif %}
+                        </button>
+                    </form>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+<style>
+.status-active { color: #27ae60; font-weight: 600; }
+.status-inactive { color: #e74c3c; font-weight: 600; }
+.inactive-row { background-color: rgba(231, 76, 60, 0.05); }
+</style>
+
+<script>
+function toggleInactiveTeachers() {
+    const showInactive = document.getElementById('show-inactive-teachers').checked;
+    const inactiveRows = document.querySelectorAll('.inactive-row');
+    
+    inactiveRows.forEach(row => {
+        row.style.display = showInactive ? '' : 'none';
+    });
+    
+    // URL parametresini güncelle
+    const url = new URL(window.location);
+    if (showInactive) {
+        url.searchParams.set('show_inactive', 'true');
+    } else {
+        url.searchParams.delete('show_inactive');
+    }
+    window.history.replaceState({}, '', url);
+}
+
+// Sayfa yüklendiğinde checkbox durumunu ayarla ve pasif öğretmenleri gizle
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const showInactive = urlParams.get('show_inactive') === 'true';
+    
+    const checkbox = document.getElementById('show-inactive-teachers');
+    if (checkbox) {
+        checkbox.checked = showInactive;
+        toggleInactiveTeachers();
+    }
+});
+</script>
 {% endblock %}

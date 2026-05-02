@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}Ders Programı — E-Yoklama{% endblock %}
+{% block content %}
+<h1>Ders Programım</h1>
+
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>Ders</th>
+                <th>Gün</th>
+                <th>Saat</th>
+                <th>Sınıf</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in schedules %}
+            <tr>
+                <td>{{ s.course.name }} ({{ s.course.code or '-' }})</td>
+                <td>{{ day_name(s.day_of_week) }}</td>
+                <td>{{ s.start_time }} - {{ s.end_time }}</td>
+                <td>{{ s.room or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
