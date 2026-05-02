@@ -446,7 +446,80 @@ Adım 1-6 tamamlandı. Faz 0 (Altyapı) büyük ölçüde tamamlanmış durumda:
 - `templates/teacher/schedule.html` — **Güncellendi.** "Yoklama Oturumu" bölümü eklendi: aktif oturum varsa link, yoksa başlatma formu (ders saati seçimi, kod yenileme süresi, IP filtresi)
 - `templates/teacher/dashboard.html` — **Güncellendi.** Aktif yoklama olan derslerde "Aktif Yoklama" butonu
 
-#### 10.4. Minimal Seed Data
+#### 10.4. Öğrenci Doğrulama Sistemi
+
+**Dosya:** `models/device_pairing.py` — **YENİ**
+- `DevicePairing` modeli: MAC adresi eşleme, 1 aylık süre, yenileme kontrolü
+- `get_active_pairing()` ve `get_by_mac_address()` metodları
+
+**Dosya:** `models/location_verification.py` — **YENİ**
+- `LocationVerification` modeli: GPS ve ağ doğrulama, şüpheli işaretleme
+- `verify_location()` ve `verify_network()` metodları
+- `_is_valid_gps_coordinate()` ile koordinat validasyonu
+
+**Dosya:** `views/student.py` — **Güncellendi**
+- `GET /student/verifications` — Doğrulama sayfası route'u
+- API endpoint'leri:
+  - `GET /student/api/get-mac-address` — MAC adresi al
+  - `POST /student/api/pair-device` — Cihaz eşleme
+  - `POST /student/api/verify-location` — GPS doğrulama
+  - `GET /student/api/verify-network` — Ağ doğrulama
+  - `GET /student/api/start-verification` — Doğrulama kodu başlat
+  - `POST /student/api/submit-verification` — Kod gönder
+  - `GET /student/api/check-device-pairing` — Eşleme kontrolü
+- MAC adresi benzersizlik kontrolü: bir MAC sadece bir kullanıcıda kullanılabilir
+
+**Dosya:** `templates/student/verifications.html` — **YENİ**
+- Cihaz eşleme ve konum doğrulama arayüzü
+- Modal adımları: cihaz eşleme → konum doğrulama → kod girişi
+- JavaScript fetch API çağrıları
+
+**Dosya:** `templates/student/dashboard.html` — **Güncellendi**
+- "Yoklamaya Gir" butonu → doğrulama modal'ı
+- Cihaz eşleme kontrolü ve doğrulama akışı
+
+**Dosya:** `templates/components/_nav.html` — **Güncellendi**
+- Öğrenci menüsüne "Doğrulamalar" linki eklendi
+
+**Dosya:** `services/verification_service.py` — **Güncellendi**
+- `validate_ip()` fonksiyonu: local ağ IP'lerine izin
+- GPS ve network validasyon fonksiyonları
+
+#### 10.5. Güvenlik İyileştirmeleri
+
+**MAC Adresi Benzersizliği:**
+- Bir MAC adresi sadece bir kullanıcı hesabında kullanılabilir
+- İkinci kullanıcı aynı cihazı kullanmaya çalıştığında uyarı mesajı
+
+**Konum Doğrulama Hassasiyeti:**
+- GPS doğruluğu kontrolü (100m'den daha az hassas ise şüpheli)
+- Kampüs radius daraltma (500m → 300m, 300m → 200m)
+- Koordinat geçerlilik kontrolü (Türkiye sınırları, aşırı yuvarlatma)
+
+**Ağ Doğrulama:**
+- Eduroam SSID kontrolü
+- POST metodu ile network bilgisi gönderimi
+- Eduroam olmayan ağlar şüpheli olarak işaretlenir
+
+**Cihaz Eşleme Zorunluluğu:**
+- Konum doğrulaması için önce cihaz eşlemesi gerekli
+- Yoklamaya katılım için cihaz eşleme kontrolü
+
+#### 10.6. Mobil Uyumluluk ve Backend Konfigürasyon
+
+**Dosya:** `templates/base.html` — **Güncellendi**
+- Inline CSS ile mobil menü düzeltmeleri
+- `!important` ile mobile override'lar
+
+**Dosya:** `static/css/style.css` — **Güncellendi**
+- Mobil responsive menü düzeltmeleri
+- `.nav-open` sınıfı eklendi
+
+**Backend IP Doğrulama:**
+- Local ağ IP'lerine bypass (192.168., 10., 172.)
+- `flask run --host=0.0.0.0` ile çalışırken session stabilitesi
+
+#### 10.7. Minimal Seed Data
 
 **Dosya:** `seed.py` — **Tamamen yeniden yazıldı**
 
@@ -634,6 +707,135 @@ Yeni modüler monolit yapısına geçildikten sonra kullanılmayan eski dosyalar
 **Tarih:** 2026-04-26
 
 **Kapsam:** FR-06, FR-07 — Öğrenci yoklama geçişinde IP/GPS doğrulama ve doğrulama başarısızsa öğrencinin "Yine de Devam Et" ile şüpheli kayıt oluşturabilmesi.
+
+---
+
+### 15. Faz 12 — UI Renk Paleti ve Aktif/Pasif Yönetim (Tamamlandı)
+
+**Tarih:** 2026-05-01
+
+**Kapsam:** Modern mavi renk paleti uygulaması ve kullanıcı yönetimi için aktif/pasif sistem.
+
+#### 15.1. Mavi Renk Paleti Uygulaması
+
+**Dosya:** `static/css/style.css` — **Güncellendi**
+
+**Değişiklikler:**
+- Ana renkler: `#1e3c72` (koyu mavi), `#2a5298` (orta mavi), `#3498db` (parlak mavi)
+- Gradient arka planlar: `linear-gradient(135deg, #667eea 0%, #764ba2 100%)`
+- Navbar gradient: `linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)`
+- Buton gradient'ler ve hover efektleri
+- Yarı şeffaf container'lar ve blur efektleri
+- Box-shadow ve modern görsel efektler
+
+#### 15.2. Aktif/Pasif Yönetim Sistemi
+
+**Database Güncellemeleri:**
+- `User.is_active` ve `Course.is_active` alanları zaten mevcut
+- Yeni route'lar eklendi
+
+**Yeni Route'lar:**
+- `POST /admin/toggle_student/<id>` — Öğrenci aktif/pasif değiştirme
+- `POST /admin/toggle_teacher/<id>` — Öğretmen aktif/pasif değiştirme
+- `POST /admin/toggle_course/<id>` — Ders aktif/pasif değiştirme
+
+**UI Özellikleri:**
+- Durum göstergeleri: Aktif (yeşil), Pasif (kırmızı)
+- Checkbox filtreleme: "Pasif objeleri göster"
+- URL parametresi ile filtre durumu saklama
+- Pasif objeler şeffaf ve farklı arka plan renginde
+
+**Güvenlik:**
+- Normal kullanıcılar sadece aktif objeleri görebilir
+- Admin pasif objeleri yönetebilir
+- Sorgular otomatik olarak aktif objelerle sınırlı
+
+---
+
+### 16. Faz 13 — Database Tabanlı Ders Yönetimi (Tamamlandı)
+
+**Tarih:** 2026-05-01
+
+**Kapsam:** Popüler dersler database'i ve bölüm bazlı ders seçim sistemi.
+
+#### 16.1. PopularCourse Model Güncellemeleri
+
+**Dosya:** `models/popular_course.py` — **Güncellendi**
+
+**Değişiklikler:**
+- `course_code` alanına unique constraint eklendi
+- 90 popüler ders 21 bölüm için seed edildi
+- Her ders standart kodlarla (BMP101, YZM101, TIP101 vb.)
+
+#### 16.2. Ders Oluşturma Sistemi
+
+**Dosyalar:**
+- `views/admin.py` — `create_course()` route'u güncellendi
+- `templates/admin/courses.html` — Form dinamik hale getirildi
+
+**Özellikler:**
+- Popüler ders seçimi dropdown menü
+- Otomatik kod ve açıklama doldurma
+- Özel ders oluşturma opsiyonu
+- Bölüm bazlı öğretmen filtreleme
+- Bölüm uyumu kontrolü (esnektir)
+
+#### 16.3. Örnek Ders Kodları
+
+- **Bilgisayar Mühendisliği:** BMP101, BMP201, BMP301...
+- **Yazılım Mühendisliği:** YZM101, YZM201, YZM301...
+- **Tıp:** TIP101, TIP102, TIP103...
+- **Hukuk:** HUK101, HUK201, HUK202...
+
+---
+
+### 17. Faz 14 — Öğretmen Onay ve Esnek Öğrenci Sistemi (Tamamlandı)
+
+**Tarih:** 2026-05-01
+
+**Kapsam:** İki kademeli onay sistemi ve sınıf kısıtlamasının kaldırılması.
+
+#### 17.1. Onay Sistemi Database
+
+**Model Güncellemeleri:**
+- `Course.teacher_approval` (0=bekliyor, 1=onaylı, 2=redded)
+- `Course.status` (0=bekliyor, 1=aktif, 2=pasif)
+- `CourseStudent.admin_approval` (0=bekliyor, 1=onaylı, 2=redded)
+
+#### 17.2. Öğretmen Onay Paneli
+
+**Yeni Route'lar:**
+- `GET /teacher/course_approvals` — Öğretmenin onay bekleyen dersleri
+- `POST /teacher/approve_course/<id>` — Ders onayla/reddet
+- `GET /teacher/student_approvals` — Öğrenci onayları
+- `GET /admin/student_approvals` — Admin öğrenci onayları
+- `POST /admin/approve_student/<id>` — Öğrenci onayla/reddet
+
+**Template'ler:**
+- `templates/teacher/course_approvals.html` — Ders onay ekranı
+- `templates/teacher/student_approvals.html` — Öğrenci onay ekranı
+- `templates/admin/student_approvals.html` — Admin onay ekranı
+
+#### 17.3. İş Akışı
+
+1. **Admin** ders oluşturur → **Öğretmen onayı bekler**
+2. **Öğretmen** dersi onaylar → **Ders aktif olur**
+3. **Öğretmen** öğrenci ekler → **Admin onayı bekler**
+4. **Öğrenci** onay beklemeden **yoklamalara katılır**
+5. **Admin** onay verince **öğrenci istatistikleri görünür**
+
+#### 17.4. Esnek Öğrenci Sistemi
+
+**Değişiklikler:**
+- Sınıf kısıtlaması kaldırıldı (1. Sınıf → 3. Sınıf derse eklenebilir)
+- Öğretmen branşı olmayan öğretmen her dersi verebilir
+- Admin/öğretmen kararıyla sınıf ayrımı yapılmadan öğrenci eklenebilir
+- Yoklama katılımı admin onayından bağımsız
+
+**Güvenlik ve Kontrol:**
+- Bölüm uyuşmazlıkları gösterilir ama engellenmez
+- İki kademeli onay sistemi ile yetki kontrolü
+- Onay durumları renkli olarak gösterilir
 
 #### 14.1. Verification Service
 
@@ -914,13 +1116,87 @@ Eklenen/düzenlenen stiller:
 
 ---
 
-### 20. Faz 10 — Offline Destek (Tamamlandı)
+### 20. Faz 11 — Öğrenci Doğrulama Sistemi (Devam Eden)
+
+**Tarih:** 2026-05-02
+
+**Kapsam:** Öğrenci doğrulama sistemi, mobil uyumluluk, güvenlik iyileştirmeleri
+
+#### 20.1. Çözülen Sorunlar
+
+**✅ MAC Adresi Benzersizliği:**
+- Bir MAC adresi sadece bir kullanıcı hesabında kullanılabilir
+- İkinci kullanıcı aynı cihazı kullanmaya çalıştığında uyarı mesajı
+
+**✅ Cihaz Eşleme Zorunluluğu:**
+- Konum doğrulaması için önce cihaz eşlemesi gerekli
+- Yoklamaya katılım için cihaz eşleme kontrolü
+
+**✅ Mobil Uyumluluk:**
+- Mobil menü düzeltmeleri ve responsive tasarım
+- Local ağda çalışırken backend konfigürasyon iyileştirmeleri
+
+**✅ Konum Doğrulama Hassasiyeti:**
+- GPS doğruluğu kontrolü ve kampüs radius daraltma
+- Koordinat geçerlilik kontrolü
+
+#### 20.2. Çözülen Backend Sorunları
+
+**✅ IP Doğrulama:**
+- Local ağ IP'lerine bypass (192.168., 10., 172.)
+- `flask run --host=0.0.0.0` ile çalışırken session stabilitesi
+
+**✅ Route Kayıt:**
+- `/student/verifications` route'u doğrulandı
+- Debug test rotası eklendi
+
+#### 20.3. Beklenen Eksiklikler ve Çözülmesi Gereken Sorunlar
+
+**❌ Öğretmen Rolündeki Ders Programı Tablosu:**
+- Öğretmen dashboard'ında ders programı tablosu görüntülenemiyor
+- Schedule verilerinin template'e doğru aktarılmaması
+
+**❌ Flask Run --host ile Doğrulamalar Sayfası Görüntülenememe:**
+- `flask run --host=0.0.0.0 --port=5000` ile başlatıldığında doğrulamalar sayfası 404 veriyor
+- Local ağ konfigürasyon sorunları devam ediyor
+
+**❌ Konum Doğrulama ve Ağ Eduroam Kontrollerindeki Eksiklikler:**
+- GPS doğrulaması sahte konumları tam olarak engelleyemiyor
+- Eduroam SSID kontrolü client-side'da yetersiz
+- Network doğrulaması daha gerçekçi SSID bilgisi gerektiriyor
+
+**❌ Şüpheli Kontrolü ve Öğretmen Tarafında Şüpheli İşlemleri:**
+- Şüpheli doğrulamalar öğretmen listesinde işaretlenmiyor
+- Öğretmen şüpheli öğrencileri "var/yok" olarak işeleyemiyor
+- Şüpheli durumunun öğretmen arayüzüne yansıtılmaması
+
+#### 20.4. Öncelikli Çözüm Adımları
+
+1. **Öğretmen Ders Programı Tablosu:**
+   - Teacher dashboard'da schedule verilerini kontrol et
+   - Template'e doğru veri aktarımını sağla
+
+2. **Doğrulamalar Sayfası 404 Sorunu:**
+   - Authentication ve session kontrolünü detaylı incele
+   - Blueprint yüklemesini doğrula
+
+3. **Gelişmiş Konum Doğrulama:**
+   - GPS spoofing korumaları güçlendir
+   - Real-time SSID detection implement et
+
+4. **Şüpheli Öğrenci Yönetimi:**
+   - Şüpheli doğrulamaları öğretmen listesinde göster
+   - Şüpheli durumunu yönetme arayüzü ekle
+
+---
+
+### 21. Faz 10 — Offline Destek (Tamamlandı)
 
 **Tarih:** 2026-04-26
 
 **Kapsam:** FR-23 — Öğrenci yoklama akışında çevrimdışı kayıt ve bağlantı gelince senkronizasyon.
 
-#### 20.1. Service Worker
+#### 21.1. Service Worker
 
 **Dosyalar:**
 - `sw.js` — Uygulama shell'i, CSS ve temel JS dosyaları cache'lenir.
