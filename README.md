@@ -144,6 +144,18 @@ View katmanı hiçbir zaman doğrudan modele veya veritabanına erişmez; her i�
 
 ---
 
+## Katkı
+
+Katkıda bulunmak için:
+
+1. Repoyu fork edin
+2. Yeni bir branch oluşturun (`git checkout -b feature/yeni-ozellik`)
+3. Değişikliklerinizi commit edin (`git commit -m "feat: açıklama"`)
+4. Branch'i push edin (`git push origin feature/yeni-ozellik`)
+5. Pull Request açın
+
+---
+
 ## Lisans
 
 Bu proje [MIT Lisansı](LICENSE) kapsamında lisanslanmıştır.
