@@ -52,7 +52,14 @@ def seed():
             role=1,
             branch='Veri Tabani',
         )
-        db.add_all([t1, t2])
+        t3 = User(
+            username='ferhat-kara-t',
+            email='ferhat-kara-t@eyoklama.test',
+            hashed_password=hash_password('123ferhat'),
+            role=1,
+            branch='Yazilim Muhendisligi',
+        )
+        db.add_all([t1, t2, t3])
         db.flush()
 
         # ==================== OGRENCILER ====================
@@ -73,6 +80,42 @@ def seed():
                 )
                 students.append(s)
 
+        # Add the specific student user requested
+        s_special = User(
+            username='ferhat-kara-s',
+            email='ferhat-kara-s@eyoklama.test',
+            hashed_password=hash_password('123ferhat'),
+            role=2,
+            student_number='20241001',
+            department='Bilgisayar Muhendisligi',
+            class_name='1. Sinif',
+        )
+        students.append(s_special)
+        
+        # Add Nisanur Kara
+        s_nisanur = User(
+            username='nisanur-kara',
+            email='nisanur.kara@eyoklama.test',
+            hashed_password=hash_password('123456'),
+            role=2,
+            student_number='20241002',
+            department='Bilgisayar Muhendisligi',
+            class_name='2. Sinif',
+        )
+        students.append(s_nisanur)
+        
+        # Add Berfin
+        s_berfin = User(
+            username='berfin',
+            email='berfin@eyoklama.test',
+            hashed_password=hash_password('123456'),
+            role=2,
+            student_number='20241003',
+            department='Bilgisayar Muhendisligi',
+            class_name='2. Sinif',
+        )
+        students.append(s_berfin)
+        
         db.add_all(students)
         db.flush()
 
@@ -104,17 +147,29 @@ def seed():
             class_name='3. Sinif',
             semester='2025-2026 Bahar',
         )
-        db.add_all([c1, c2, c3])
+        c4 = Course(
+            name='Web Programlama',
+            code='WEB202',
+            description='Modern web teknolojileri ve frameworkler',
+            teacher_id=t3.id,
+            department='Bilgisayar Muhendisligi',
+            class_name='2. Sinif',
+            semester='2025-2026 Bahar',
+        )
+        db.add_all([c1, c2, c3, c4])
         db.flush()
 
         # ==================== DERS KAYITLARI ====================
         # Ilk 5 ogrenci (Bilgisayar Muh.) -> YZM301 ve ALG401
         # Ilk 3 ogrenci -> VTY201
+        # Tum ogrenciler -> WEB202 (ferhat-kara-t'nin dersi)
         for s in students[:5]:
             db.add(CourseStudent(course_id=c1.id, student_id=s.id))
             db.add(CourseStudent(course_id=c3.id, student_id=s.id))
         for s in students[:3]:
             db.add(CourseStudent(course_id=c2.id, student_id=s.id))
+        for s in students:
+            db.add(CourseStudent(course_id=c4.id, student_id=s.id))
 
         # ==================== DERS PROGRAMI ====================
         db.add(Schedule(
@@ -133,6 +188,11 @@ def seed():
             start_time='10:00', end_time='12:50',
             room='D-301',
         ))
+        db.add(Schedule(
+            course_id=c4.id, day_of_week=4,
+            start_time='14:00', end_time='16:50',
+            room='B-101',
+        ))
 
         db.commit()
 
@@ -142,18 +202,24 @@ def seed():
         print('  admin / admin123\n')
         print('--- OGRETMENLER ---')
         print('  ogretmen1 / ogretmen123  (Yazilim Muhendisligi)')
-        print('  ogretmen2 / ogretmen123  (Veri Tabani)\n')
+        print('  ogretmen2 / ogretmen123  (Veri Tabani)')
+        print('  ferhat-kara-t / 123ferhat  (Yazilim Muhendisligi)\n')
         print('--- OGRENCILER ---')
         print('  ogrenci1 ~ ogrenci10 / ogrenci123')
+        print('  ferhat-kara-s / 123ferhat')
+        print('  nisanur-kara / 123456')
+        print('  berfin / 123456')
         print(f'  Bolumler: {", ".join(departments)}\n')
         print('--- DERSLER ---')
         print(f'  {c1.code} {c1.name} — {t1.username} — 5 ogrenci')
         print(f'  {c2.code} {c2.name} — {t2.username} — 3 ogrenci')
-        print(f'  {c3.code} {c3.name} — {t1.username} — 5 ogrenci\n')
+        print(f'  {c3.code} {c3.name} — {t1.username} — 5 ogrenci')
+        print(f'  {c4.code} {c4.name} — {t3.username} — {len(students)} ogrenci\n')
         print('--- DERS PROGRAMI ---')
         print('  YZM301: Pazartesi 09:00-11:50 D-301')
         print('  VTY201: Carsamba 13:00-14:50 B-205')
         print('  ALG401: Persembe 10:00-12:50 D-301')
+        print('  WEB202: Cuma 14:00-16:50 B-101')
         print('\n============================')
 
 

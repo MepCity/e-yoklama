@@ -35,6 +35,9 @@ class Config:
     # Devamsızlık Uyarı Eşiği (FR-17)
     ABSENCE_WARNING_THRESHOLD = 0.80
 
+    # Cihaz eşleşmesi zorunluluğu
+    REQUIRE_DEVICE_PAIRING = os.environ.get('REQUIRE_DEVICE_PAIRING', 'true').lower() == 'true'
+
 
 class DevelopmentConfig(Config):
     DEBUG = True
@@ -49,6 +52,7 @@ class TestConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     RATELIMIT_ENABLED = False
+    REQUIRE_DEVICE_PAIRING = True
 
 
 config = {

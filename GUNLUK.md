@@ -34,13 +34,17 @@ Projenin mevcut kodu ve dokümanları (SRS v1.3, SDD v1.0) detaylıca incelendi.
 | FR-06 | Çok katmanlı doğrulama (İnternet + IP + GPS) | Stub (return True) |
 | FR-07 | "Yine de Devam Et" + loglama | Yok |
 | FR-08 | Şüpheli yoklamalar ekranı | Yok |
-| FR-09 | Öğretmen şüpheli onay/ret mekanizması | Yok |
-| FR-11 | Excel (.xlsx) dışa aktarma | Yok |
-| FR-12 | Yoklama oturumunu sonlandırma | Yok |
-| FR-13 | UUID tabanlı benzersiz oturum kimliği | Yok |
-| FR-14 | Tablo + grafik istatistikler | Kısmen (grafik yok) |
-| FR-15 | Aynı oturuma çift katılım engeli (duplicate check) | Yok |
-| FR-23 | Offline veri saklama + senkronizasyon | Yok |
+| FR-09 | Öğretmen şüpheli onay/ret mekanizması | ✅ Tamamlandı |
+| FR-11 | Excel (.xlsx) dışa aktarma | ✅ Tamamlandı |
+| FR-12 | Yoklama oturumunu sonlandırma | ✅ Tamamlandı |
+| FR-13 | UUID tabanlı benzersiz oturum kimliği | ✅ Tamamlandı |
+| FR-14 | Tablo + grafik istatistikler | ✅ Tamamlandı |
+| FR-15 | Aynı oturuma çift katılım engeli (duplicate check) | ✅ Tamamlandı |
+| FR-23 | Offline veri saklama + senkronizasyon | ✅ Tamamlandı |
+| FR-20 | Admin paneli öğrenci düzenleme butonları | ✅ Tamamlandı |
+| FR-21 | Konum doğrulama sistemi | ✅ Tamamlandı |
+| FR-22 | Öğretmen paneli şüpheli yoklama yönetimi | ✅ Tamamlandı |
+| FR-23 | Offline veri saklama + senkronizasyon | ✅ Tamamlandı |
 
 **Tespit edilen teknik sorunlar:**
 - `app.py:43` — `os.system('start msedge ...')` macOS'ta çalışmaz
@@ -1275,4 +1279,314 @@ python3 tests/integration_check.py
 
 ---
 
-*Sonraki adımlar bu dosyaya eklenecektir.*
+---
+
+## 2026-05-02 — fk/general-dev Branch İnceleme + Temizlik + Düzeltmeler
+
+### 22. fk/general-dev Analizi
+
+**Tarih:** 2026-05-02
+
+`fk/general-dev` branch'i main'e göre 2 commit öndeydi ve 6.300+ satır ekleme içeriyordu. Branch incelendi; yeni özellikler tespit edildi ve birden fazla kritik sorun belirlendi.
+
+#### 22.1. Eklenen Yeni Özellikler
+
+| Alan | İçerik |
+|------|--------|
+| **Yeni Modeller** | `Building`, `Classroom` (fiziksel derslik yönetimi), `DevicePairing` (MAC tabanlı cihaz eşleme, 30 günlük TTL), `LocationVerification` (GPS/eduroam doğrulama, 1 dk TTL), `PopularCourse` |
+| **Course Modeli** | `building_id`, `classroom_id`, `day_of_week`, `start_time`, `end_time`, `teacher_approval`, `status` alanları eklendi |
+| **CourseStudent** | `admin_approval` alanı eklendi |
+| **Onay Sistemi** | Ders oluşturma ve öğrenci kaydı için öğretmen/admin onay iş akışı |
+| **Öğretmen** | Ders detay sayfası, öğrenci yoklama geçmişi, tüm program görünümü, program düzenleme, onay ekranları |
+| **Öğrenci** | Ders programı sayfası, doğrulamalar sayfası |
+| **Admin** | Öğrenci/öğretmen/ders toggle (aktif/pasif), kayıt onay ekranı, program yönetimi |
+| **Toggle Route'ları** | `toggle_student`, `toggle_teacher`, `toggle_course` endpoint'leri |
+
+#### 22.2. Tespit Edilen Sorunlar
+
+1. **`pandas` requirements.txt'te yoktu** → `import pandas as pd` ile `views/teacher.py` başlatılamıyordu.
+2. **`navigator.geolocation` insecure context kısıtı** → `flask run --host=0.0.0.0` ile erişildiğinde tarayıcı `http://192.168.x.x` adresinde geolocation API'yi blokluyor, doğrulama akışı tamamen kırılıyordu.
+3. **`attendance_service.resolve_suspicious` hatalı çağrı** → modül import edilmemişken modül adıyla çağrılıyordu (`NameError`).
+4. **`models/classroom.py` yanlış import** → `from database import Base` yerine `from database.session import Base` olmalıydı.
+5. **`verification_service.py` aşırı geniş IP bypass** → tüm private ağlar (`192.168.`, `10.`, `172.`) bypass ediliyordu; orijinal sadece localhost bypass'ına döndürüldü.
+6. **Nav template debug kalıntıları** → "Doğrulamalar" linki rol kontrolü dışında herkese gösteriliyordu; admin/öğretmen de görüyordu.
+7. **`app.py` debug route** → `/debug-test` endpoint'i production'a sızmıştı.
+8. **`print()` debug satırları** → `views/teacher.py`'de birden fazla `print()` ifadesi vardı.
+9. **Kirli commit'ler** → `.pyc` dosyaları, `e_yoklama.db`, `check_db.py`, `database_check.py`, `update_database.py`, `seed_*_fixed.py` git'e commit'lenmişti.
+
+---
+
+### 23. fk/general-dev Temizlik + Düzeltme Operasyonu
+
+**Tarih:** 2026-05-02
+
+#### 23.1. Kirli Dosyalar Temizlendi
+
+`git rm --cached` ile git tracking'den çıkarıldı ve diskten silindi:
+- `database/__pycache__/`, `models/__pycache__/`, `services/__pycache__/`, `sockets/__pycache__/`, `utils/__pycache__/`, `views/__pycache__/` — tüm pycache klasörleri
+- `e_yoklama.db` — canlı veritabanı dosyası
+- `check_db.py`, `database_check.py`, `update_database.py` — tek kullanımlık debug script'leri
+- `seed_courses_fixed.py`, `seed_popular_courses.py`, `seed_popular_courses_fixed.py` — fazladan seed dosyaları
+
+`.gitignore` mevcut kurallar zaten doğruydu; sorun önceki commit'lerden geliyordu.
+
+#### 23.2. requirements.txt — pandas Eklendi
+
+```
+pandas==2.2.3
+```
+
+`views/teacher.py`'deki `import pandas as pd` ve `course_schedule` view'ındaki DataFrame mantığı `pandas` gerektiriyordu. Paket eksikliği uygulamanın öğretmen blueprint'ini tamamen kullanılamaz hale getiriyordu.
+
+#### 23.3. models/classroom.py — Import Düzeltildi
+
+```python
+# Önce (hatalı)
+from database import Base
+
+# Sonra (doğru — diğer modeller gibi)
+from database.session import Base, utcnow_str
+```
+
+#### 23.4. services/verification_service.py — IP Bypass Daraltıldı
+
+Branch'te tüm private ağlar (`192.168.`, `10.`, `172.`) bypass ediliyordu. Bu, aynı ağdaki herhangi bir cihazın IP doğrulamasını geçebileceği anlamına geliyordu. Orijinal davranış geri yüklendi: sadece `127.0.0.1` ve `::1` bypass edilir.
+
+#### 23.5. views/teacher.py — Dört Düzeltme
+
+1. `import pandas as pd` satırı kaldırıldı.
+2. `course_schedule` view'ındaki `pd.DataFrame` mantığı saf Python `dict` yapısıyla yeniden yazıldı.
+3. `attendance_service.resolve_suspicious(...)` → `resolve_suspicious(...)` (fonksiyon import listesine eklendi).
+4. İki yerde `print()` debug satırları kaldırıldı.
+
+#### 23.6. app.py — Debug Route Kaldırıldı
+
+```python
+# Kaldırıldı:
+@app.route('/debug-test')
+def debug_test():
+    return "Sunucu çalışıyor, rota bulundu!", 200
+```
+
+#### 23.7. templates/components/_nav.html — Rol Kontrolü Düzeltildi
+
+"Doğrulamalar" linki ve diğer sabit linkler rol kontrolü dışında herkese gösteriliyordu (debug `<!-- TEST: Her zaman göster -->` yorumuyla). Nav template tamamen yeniden düzenlendi:
+- Her rol yalnızca kendi linklerini görür (admin/öğretmen/öğrenci).
+- "Doğrulamalar" yalnızca `role == 2` (öğrenci) bloğunda görünür.
+- Debug yorumları temizlendi.
+
+#### 23.8. templates/student/dashboard.html — Geolocation Kalıcı Çözümü
+
+**Sorun:** Tarayıcılar `navigator.geolocation` API'sini yalnızca HTTPS veya `localhost` üzerinde çalıştırır. `flask run --host=0.0.0.0` ile erişildiğinde (`http://192.168.x.x:5000`) geolocation bloklanıyordu ve catch bloğu akışı tamamen durduruyordu.
+
+**Çözüm:** Üç kademeli fallback zinciri uygulandı:
+
+```
+GPS dene
+  ├── Başarılı + kampüs içi  →  doğrulama koduna geç
+  ├── Başarılı + kampüs dışı  →  network doğrulamasına geç
+  └── Kullanılamaz / reddedildi  →  network doğrulamasına geç
+
+Network doğrula (eduroam)
+  ├── Eduroam tespit edildi  →  doğrulama koduna geç
+  └── Başarısız / kullanılamaz  →  override seçeneği sun
+
+Override (şüpheli kayıt)
+  └── Öğrenci onaylarsa  →  doğrulama koduna geç (status='suspicious')
+```
+
+Ek düzeltmeler:
+- `submitAttendance` fonksiyonundaki `/session/` path'i `/student/session/` olarak düzeltildi (route prefix eksikti).
+- Override bayrağı form verisi olarak check-in endpoint'ine iletilir.
+- Geri sayım timer'ı modal kapandığında düzgünce temizlenir.
+
+#### 23.9. Doğrulama
+
+- `py_compile` tüm `.py` dosyaları için başarılı.
+- `create_app('testing')` başarılı; 55 route doğrulandı (debug-test yok).
+- `git status` — untracked dosya yok.
+
+---
+
+### 24. Verifications + Cihaz Eşleşmesi Entegrasyonu
+
+**Tarih:** 2026-05-02
+
+#### 24.1. Tespit Edilen Eksik
+
+Öğrenci rolündeki `verifications` sayfası cihaz eşleme ve konum doğrulaması için açılmıştı; ancak bu doğrulama sonucu aktif yoklama kaydıyla tam entegre değildi.
+
+Eksik davranışlar:
+- `verifications` sayfasında aktif yoklama seçimi yoktu.
+- `/api/submit-verification` doğrulama kodunu onaylıyor ancak `AttendanceRecord` oluşturmuyordu.
+- Manuel/başarısız doğrulama öğretmen tarafındaki şüpheli yoklama onay akışına düşmüyordu.
+- Cihaz eşleşmesi UI'da görünse de check-in endpoint'lerinde server-side zorunlu değildi.
+
+#### 24.2. Yapılan Düzeltmeler
+
+- `views/student.py`
+  - Öğrenci `verifications` sayfasına aktif yoklamalar listesi eklendi.
+  - `manual_verification` endpoint'i eklendi; otomatik GPS/ağ doğrulaması başarısızsa aktif doğrulama şüpheli olarak oluşturulur.
+  - `submit_verification` artık seçili `session_id` ve öğretmenin gösterdiği yoklama koduyla `attendance_service.check_in(...)` çağırır.
+  - Şüpheli manuel doğrulamalar `force_suspicious=True` ile gerçek `AttendanceRecord.status = 'suspicious'` kaydına dönüşür.
+  - `check_in`, `verify-location`, `verify-network`, `manual-verification`, `start-verification`, `submit-verification` endpoint'lerine aktif cihaz eşleşmesi kontrolü eklendi.
+
+- `services/attendance_service.py`
+  - `check_in(...)` fonksiyonuna `force_suspicious` parametresi eklendi.
+  - Doğrulama teknik olarak geçse bile manuel/şüpheli ön doğrulama varsa kayıt `suspicious` oluşturulur.
+  - Şüpheli kayıtlar için verification log'a `manual` / `FORCED_SUSPICIOUS` detayı yazılır.
+
+- `models/location_verification.py`
+  - `get_active_verification(...)` yalnızca süresi dolmamış en güncel doğrulamayı döndürecek şekilde güncellendi.
+
+- `templates/student/verifications.html`
+  - Aktif yoklamalar kartı eklendi.
+  - Cihaz eşleşmesi yoksa aktif yoklama butonu disabled gösterilir.
+  - Öğrenci doğrulamadan sonra öğretmenin gösterdiği yoklama kodunu girerek aynı ekrandan yoklamaya katılabilir.
+  - Şüpheli kayıt oluşursa kullanıcıya öğretmen onayına gönderildiği bildirilir.
+
+- `templates/student/dashboard.html`
+  - GPS başarılı olduğunda koordinatlar check-in formuna taşınır.
+  - Daha önce yapılmış aktif konum doğrulaması varsa dashboard check-in akışı bunu kullanabilir.
+
+#### 24.3. Test Kapsamı
+
+`tests/integration_check.py` güncellendi:
+- Cihaz eşleşmesi olmadan yoklama denemesi reddedilir.
+- Cihaz eşleşmesi sonrası dashboard check-in akışı çalışır.
+- `verifications` üzerinden manuel doğrulama + aktif yoklama kodu gönderimi gerçek `AttendanceRecord` oluşturur.
+- Manuel doğrulama kaynaklı kayıt `suspicious` olur ve öğretmen onay akışına uygundur.
+
+#### 24.4. Doğrulama
+
+- `PYTHONPYCACHEPREFIX=/private/tmp/e-yoklama-pycache python3 -m compileall .` başarılı.
+- `python3 tests/integration_check.py` başarılı (`integration ok`).
+
+---
+
+### 25. Dashboard Override ve Cihaz Eşleşmesi Konfigürasyonu
+
+**Tarih:** 2026-05-02
+
+#### 25.1. Tespit Edilen Sorunlar
+
+`verifications` entegrasyonu sonrası iki regresyon riski tespit edildi:
+
+1. Dashboard üzerindeki override akışı `/api/start-verification` çağırıyordu; fakat otomatik GPS/ağ doğrulaması başarısız olduğunda aktif `LocationVerification` oluşmadığı için endpoint `400` dönüyordu.
+2. Dashboard JS hâlâ `/api/start-verification` response'unda `code` alanı bekliyordu; endpoint artık öğretmen kodunu üretmediği için UI'da bu alan anlamsız hale gelmişti.
+3. Cihaz eşleşmesi server-side zorunlu hale geldiği için demo/test ortamında mevcut seed öğrencileri cihaz eşlemeden yoklama veremiyordu.
+
+#### 25.2. Yapılan Düzeltmeler
+
+- `templates/student/dashboard.html`
+  - Override butonu önce `/student/api/manual-verification` çağırır, ardından `/student/api/start-verification` ile doğrulama penceresini başlatır.
+  - `result.code` beklentisi kaldırıldı.
+  - Modal metni öğretmenin gösterdiği yoklama kodunun girilmesine göre düzenlendi.
+
+- `config.py`
+  - `REQUIRE_DEVICE_PAIRING` ayarı eklendi.
+  - Varsayılan değer production/dev için `true`; ortam değişkeniyle kapatılabilir:
+
+```bash
+REQUIRE_DEVICE_PAIRING=false
+```
+
+- `views/student.py`
+  - Aktif cihaz eşleşmesi kontrolü `REQUIRE_DEVICE_PAIRING` config değerine bağlandı.
+  - Config kapalıysa yoklama ve doğrulama endpoint'leri cihaz eşleşmesi aramaz.
+
+- `tests/integration_check.py`
+  - Cihaz eşleşmesi config ile kapatıldığında check-in akışının eşleşmesiz çalıştığı doğrulandı.
+  - Cihaz eşleşmesi açıkken eşleşmesiz yoklama reddedilir; eşleşme sonrası akış çalışır.
+
+#### 25.3. Beklenen Davranış
+
+- Production/dev varsayılanında cihaz eşleşmesi zorunludur.
+- Demo veya sınıf içi hızlı test için `REQUIRE_DEVICE_PAIRING=false` kullanılabilir.
+- Override yolunda öğrenci manuel/şüpheli doğrulama oluşturabilir ve kayıt öğretmen onayına `suspicious` olarak düşer.
+
+---
+
+### 26. Dashboard Cihaz Eşleşmesi UX Kontrolü
+
+**Tarih:** 2026-05-02
+
+#### 26.1. Tespit Edilen UX Eksikliği
+
+Cihaz eşleşmesi olmayan öğrenci dashboard'dan "Yoklamaya Gir" dediğinde modal açılıyor, GPS/network doğrulama denemeleri yapılıyor ve cihaz eşleşmesi eksikliği ancak daha sonra ortaya çıkıyordu. Bu kritik bir backend bug değildi; server-side kontroller zaten vardı. Ancak kullanıcı hatayı geç görüyordu.
+
+#### 26.2. Yapılan Düzeltmeler
+
+- `views/student.py`
+  - `/student/api/check-device-pairing` endpoint'i `REQUIRE_DEVICE_PAIRING` config değerini dikkate alır.
+  - Config kapalıysa API `has_pairing=True`, `required=False` döndürür.
+
+- `templates/student/dashboard.html`
+  - "Yoklamaya Gir" tıklanınca modal açmadan önce `/student/api/check-device-pairing` çağrılır.
+  - Cihaz eşleşmesi zorunlu ve eksikse kullanıcı hemen bilgilendirilir ve `Doğrulamalar` sayfasına yönlendirilir.
+- Böylece gereksiz GPS/network denemeleri yapılmaz.
+
+---
+
+### 27. QR Render Test Kapsamı
+
+**Tarih:** 2026-05-02
+
+#### 27.1. Tespit Edilen Eksik
+
+Öğretmen aktif yoklama ekranında QR üretimi ve render akışı vardı; ancak entegrasyon testinde QR görselinin sayfada gerçekten üretildiği doğrulanmıyordu.
+
+#### 27.2. Yapılan Düzeltme
+
+- `tests/integration_check.py`
+  - Öğretmen aktif oturum sayfasında `data:image/png;base64,` içeren QR görseli render ediliyor mu kontrol edildi.
+  - Aynı sayfada aktif yoklama kodunun `currentCode` alanında görüntülendiği doğrulandı.
+  - Şüpheli yoklama bölümü kontrolü korunarak QR testi aynı öğretmen aktif oturum akışına eklendi.
+
+#### 27.3. Doğrulama
+
+- `python3 tests/integration_check.py` başarılı olmalıdır.
+
+---
+
+### 28. Öğrenci Ders Programı Linki ve Kamera ile QR Okuma
+
+**Tarih:** 2026-05-02
+
+#### 28.1. Tespit Edilen Eksikler
+
+- Öğrenci için `/student/schedule` route'u ve sayfası vardı; ancak öğrenci nav menüsünde "Ders Programı" linki görünmüyordu.
+- Öğrenci yoklama ekranlarında QR okuma butonu vardı; fakat gerçek kamera/QR okuma yerine sadece uyarı gösteriyordu.
+
+#### 28.2. Yapılan Düzeltmeler
+
+- `templates/components/_nav.html`
+  - Öğrenci menüsüne `Ders Programı` linki eklendi.
+
+- `templates/student/dashboard.html`
+  - Yoklama modalına QR scanner video alanı eklendi.
+  - `BarcodeDetector` destekleyen tarayıcılarda kamera açılıp QR kod okunur.
+  - QR değeri okunduğunda kod input'una otomatik yazılır.
+  - Tarayıcı/kamera desteği yoksa manuel girişe düşülür.
+
+- `templates/student/verifications.html`
+  - Aktif yoklama akışındaki QR butonu gerçek kamera tarama desteğine bağlandı.
+  - Modal kapanırken veya tarama durdurulurken kamera stream'i temizlenir.
+
+- `tests/integration_check.py`
+  - Öğrenci dashboard'unda QR scanner markup ve `BarcodeDetector` entegrasyonu kontrol edildi.
+  - Öğrenci ders programı sayfasının erişilebilir olduğu doğrulandı.
+
+#### 28.3. Not
+
+Kamera ile QR okuma tarayıcı desteğine bağlıdır. `BarcodeDetector` desteklenmeyen tarayıcılarda kullanıcı manuel kod girişine yönlendirilir.
+
+---
+
+### Sonraki Adımlar
+
+Branch `main` ile merge edilmeye hazır. Gelecekte yapılabilecek geliştirmeler:
+- `DevicePairing` ve `LocationVerification` modellerindeki `@classmethod`'lar service katmanına taşınabilir (mimari tutarlılık için).
+- `PopularCourse` için admin CRUD arayüzü eklenebilir.
+- `Building`/`Classroom` için admin yönetim sayfası tamamlanabilir.
+- HTTPS kurulumu tamamlandığında geolocation tam doğrulama modu devreye alınabilir.

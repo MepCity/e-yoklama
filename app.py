@@ -10,6 +10,8 @@ socketio = SocketIO(manage_session=False)
 def create_app(config_name='development'):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+    if not app.config.get('SECRET_KEY'):
+        raise RuntimeError('SECRET_KEY ortam değişkeni production için zorunludur.')
 
     # Rate limiting
     from utils.rate_limit import limiter
@@ -29,6 +31,15 @@ def create_app(config_name='development'):
     from views.admin import admin_bp
     from views.teacher import teacher_bp
     from views.student import student_bp
+    
+    # Yeni API blueprint'leri
+    try:
+        from api.verification_simple import verification_bp
+        app.register_blueprint(verification_bp)
+        print("✅ Basitleştirilmiş API blueprint'i başarıyla yüklendi")
+    except ImportError as e:
+        print(f"⚠️ API blueprint'i yüklenemedi: {e}")
+        print("Eski API endpoint'leri kullanılacak")
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp, url_prefix='/admin')
@@ -47,10 +58,6 @@ def create_app(config_name='development'):
             elif user['role'] == 2:
                 return redirect(url_for('student.dashboard'))
         return redirect(url_for('auth.login_page'))
-
-    @app.route('/debug-test')
-    def debug_test():
-        return "Sunucu çalışıyor, rota bulundu!", 200
 
     @app.route('/sw.js')
     def service_worker():
