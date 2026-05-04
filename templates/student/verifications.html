@@ -1,5 +1,9 @@
 {% extends 'base.html' %}
 {% block title %}Doğrulamalar — E-Yoklama{% endblock %}
+{% block head %}
+<!-- Modern API Client -->
+<script src="{{ url_for('static', filename='js/api-client.js') }}"></script>
+{% endblock %}
 {% block content %}
 <div class="page-header">
     <h1>Doğrulamalar</h1>
@@ -11,7 +15,7 @@
     <div class="verification-card">
         <div class="card-header">
             <h2>📱 Cihaz Eşleme</h2>
-            <p>Cihazınızı MAC adresi ile eşleştirerek güvenli giriş yapın.</p>
+            <p>Bu tarayıcıya ait cihaz anahtarı ile güvenli giriş yapın.</p>
         </div>
         <div class="card-body">
             {% if device_pairing %}
@@ -22,7 +26,7 @@
                     </div>
                     <p class="pairing-info">
                         <strong>Eşleme Tarihi:</strong> {{ device_pairing.created_at[:10] }}<br>
-                        <strong>MAC Adresi:</strong> {{ device_pairing.mac_address }}<br>
+                        <strong>Cihaz Anahtarı:</strong> {{ device_pairing.mac_address }}<br>
                         <strong>Son Eşleme:</strong> {{ device_pairing.last_paired_at[:10] if device_pairing.last_paired_at else '-' }}
                     </p>
                     {% if device_pairing.days_until_renewal > 0 %}
@@ -68,7 +72,7 @@
                         {% if location_verification.verification_type == 'gps' %}
                             GPS Konumu
                         {% elif location_verification.verification_type == 'network' %}
-                            Eduroam Ağı
+                            Güvenilir Kampüs Ağı
                         {% else %}
                             Manuel Doğrulama
                         {% endif %}
@@ -83,12 +87,46 @@
             
             <div class="location-actions">
                 {% if device_pairing %}
-                    <button id="verifyLocationBtn" class="btn btn-success">📍 Konum Doğrula</button>
+                    <button id="verifyLocationBtn" class="btn btn-success" onclick="handleLocationVerificationClick(event)">📍 Konum Doğrula</button>
                 {% else %}
                     <button class="btn btn-secondary" disabled>📍 Konum Doğrula (Önce Cihaz Eşlemesi Yapın)</button>
                 {% endif %}
             </div>
         </div>
+    </div>
+</div>
+
+<div class="verification-card attendance-card">
+    <div class="card-header">
+        <h2>Aktif Yoklamalar</h2>
+        <p>Doğrulama tamamlandıktan sonra öğretmenin gösterdiği yoklama kodunu girin.</p>
+    </div>
+    <div class="card-body">
+        {% if active_attendance %}
+            <div class="attendance-list">
+                {% for item in active_attendance %}
+                    <div class="attendance-item">
+                        <div>
+                            <strong>{{ item.course.name }}</strong>
+                            <span>{{ item.course.code or '' }}</span>
+                        </div>
+                        {% if item.checked_in %}
+                            <span class="status-text">Kaydedildi: {{ item.record.status }}</span>
+                        {% elif not device_pairing %}
+                            <button type="button" class="btn btn-secondary" disabled>
+                                Önce Cihaz Eşle
+                            </button>
+                        {% else %}
+                            <button type="button" class="btn btn-primary attendanceStartBtn" data-session-id="{{ item.session.id }}">
+                                Yoklamaya Katıl
+                            </button>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>Şu anda katılabileceğiniz aktif yoklama bulunmuyor.</p>
+        {% endif %}
     </div>
 </div>
 
@@ -102,71 +140,46 @@
         <div class="modal-body">
             <div id="locationSteps">
                 <div class="step" id="step1">
-                    <h4>Adım 1: Konum İzni</h4>
-                    <p>Konum doğrulaması için lütfen konum izni verin.</p>
-                    <button id="requestLocationBtn" class="btn btn-primary">Konum İzni Ver</button>
-                </div>
-                
-                <div class="step hidden" id="step2">
-                    <h4>Adım 2: Konum Kontrolü</h4>
-                    <p>Konumunuz kontrol ediliyor...</p>
+                    <h4>Doğrulama Başlatılıyor</h4>
+                    <p>Konum ve ağ doğrulaması yapılıyor...</p>
                     <div class="loading-spinner"></div>
                 </div>
                 
-                <div class="step hidden" id="step3">
-                    <h4>Adım 3: Doğrulama Türü</h4>
-                    <div id="verificationOptions">
-                        <!-- GPS başarılı olursa gösterilecek -->
-                        <div id="gpsSuccess" class="verification-option hidden">
-                            <p>✅ Marmara Üniversitesi kampüsünde olduğunuz doğrulandı!</p>
-                            <button id="continueToQRBtn" class="btn btn-success">Devam Et</button>
+                <div class="step hidden" id="step2">
+                    <h4>Doğrulama Sonuçları</h4>
+                    <div class="verification-checks">
+                        <div class="check-item" id="locationCheck">
+                            <div class="check-icon" id="locationIcon">
+                                <span class="icon-placeholder">⏳</span>
+                            </div>
+                            <div class="check-content">
+                                <h5>Marmara Üniversitesi Konumu</h5>
+                                <p id="locationStatus">Kontrol ediliyor...</p>
+                            </div>
                         </div>
                         
-                        <!-- GPS başarısız olursa gösterilecek -->
-                        <div id="gpsFailed" class="verification-option hidden">
-                            <p>⚠️ Kampüs konumu doğrulanamadı.</p>
-                            <p>Eduroam ağı kontrol ediliyor...</p>
-                            <div class="loading-spinner"></div>
+                        <div class="check-item" id="wifiCheck">
+                            <div class="check-icon" id="wifiIcon">
+                                <span class="icon-placeholder">⏳</span>
+                            </div>
+                            <div class="check-content">
+                                <h5>Edurum Wi-Fi Ağı</h5>
+                                <p id="wifiStatus">Kontrol ediliyor...</p>
+                            </div>
                         </div>
-                        
-                        <!-- Eduroam başarılı olursa -->
-                        <div id="networkSuccess" class="verification-option hidden">
-                            <p>✅ Eduroam ağı tespit edildi!</p>
-                            <button id="continueToQRBtn2" class="btn btn-success">Devam Et</button>
-                        </div>
-                        
-                        <!-- Her ikisi de başarısız olursa -->
-                        <div id="manualVerification" class="verification-option hidden">
-                            <p>⚠️ Otomatik doğrulama başarısız oldu.</p>
-                            <p>Manuel olarak devam etmek isterseniz şüpheli olarak işaretleneceksiniz.</p>
-                            <button id="manualContinueBtn" class="btn btn-warning">Yine de Onayla (Şüpheli)</button>
-                        </div>
+                    </div>
+                    
+                    <div class="verification-actions" id="verificationActions">
+                        <!-- Butonlar JavaScript ile dinamik eklenecek -->
                     </div>
                 </div>
                 
-                <div class="step hidden" id="step4">
-                    <h4>Adım 4: Yoklama Kodu</h4>
-                    <p>Doğrulama aktif! Lütfen aşağıdaki kodu girin veya QR kodu okutun.</p>
-                    <div class="verification-code">
-                        <div id="currentCode" class="code-display">----</div>
-                        <div class="code-timer">
-                            <span>Kalan süre: </span>
-                            <span id="countdown">60</span>
-                            <span> saniye</span>
-                        </div>
-                    </div>
-                    <div class="verification-methods">
-                        <div class="method-input">
-                            <input type="text" id="codeInput" placeholder="Yoklama kodunu girin..." maxlength="6">
-                            <button id="submitCodeBtn" class="btn btn-primary">Kodu Gir</button>
-                        </div>
-                        <div class="method-qr">
-                            <button id="scanQRBtn" class="btn btn-info">📷 QR Kod Okut</button>
-                            <div id="qrScanner" class="qr-scanner hidden">
-                                <video id="qrVideo"></video>
-                                <button id="stopScanBtn" class="btn btn-secondary">Taramayı Durdur</button>
-                            </div>
-                        </div>
+                <div class="step hidden" id="step3">
+                    <h4>Doğrulama Tamamlandı</h4>
+                    <div class="verification-complete">
+                        <div class="success-icon">✅</div>
+                        <p>Konum doğrulaması başarıyla tamamlandı!</p>
+                        <p class="cooldown-info">Doğrulama 1 dakika boyunca geçerli olacak.</p>
                     </div>
                 </div>
             </div>
@@ -183,10 +196,10 @@
         </div>
         <div class="modal-body">
             <div class="pairing-info">
-                <p>Cihazınızı eşleştirmek için MAC adresiniz kullanılacaktır.</p>
+                <p>Cihazınızı eşleştirmek için bu tarayıcıda saklanan cihaz anahtarı kullanılacaktır.</p>
                 <p><strong>Öğrenci Numarası:</strong> {{ current_user.student_number }}</p>
-                <p><strong>MAC Adresi:</strong> <span id="macAddress">Alınıyor...</span></p>
-                <p class="warning">⚠️ Eşleme完成后 1 ay boyunca yeniden eşleme yapamazsınız.</p>
+                <p><strong>Cihaz Anahtarı:</strong> <span id="deviceKey">Alınıyor...</span></p>
+                <p class="warning">Eşleme sonrası 1 ay boyunca yeniden eşleme yapamazsınız.</p>
             </div>
             <div class="pairing-actions">
                 <button id="confirmPairingBtn" class="btn btn-primary">Cihazımı Eşle</button>
@@ -209,6 +222,31 @@
     border-radius: 12px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     overflow: hidden;
+}
+
+.attendance-card {
+    margin-top: 20px;
+}
+
+.attendance-list {
+    display: grid;
+    gap: 12px;
+}
+
+.attendance-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
+
+.attendance-item span {
+    display: block;
+    color: #64748b;
+    font-size: 0.9rem;
 }
 
 .card-header {
@@ -409,6 +447,148 @@
     border-radius: 8px;
 }
 
+.verification-checks {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin: 20px 0;
+}
+
+.check-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+.check-item.success {
+    border-color: #10b981;
+    background: #f0fdf4;
+}
+
+.check-item.error {
+    border-color: #ef4444;
+    background: #fef2f2;
+}
+
+.check-item.disabled {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.check-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    background: #f1f5f9;
+    flex-shrink: 0;
+}
+
+.check-item.success .check-icon {
+    background: #10b981;
+    color: white;
+}
+
+.check-item.error .check-icon {
+    background: #ef4444;
+    color: white;
+}
+
+.icon-placeholder {
+    font-size: 24px;
+}
+
+.check-content h5 {
+    margin: 0 0 4px 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.check-content p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+
+.check-item.success .check-content p {
+    color: #059669;
+}
+
+.check-item.error .check-content p {
+    color: #dc2626;
+}
+
+.verification-actions {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.verification-actions .btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.verification-actions .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.verification-actions .btn-success {
+    background: #10b981;
+    color: white;
+}
+
+.verification-actions .btn-success:hover:not(:disabled) {
+    background: #059669;
+}
+
+.verification-actions .btn-primary {
+    background: #3b82f6;
+    color: white;
+}
+
+.verification-actions .btn-primary:hover:not(:disabled) {
+    background: #2563eb;
+}
+
+.verification-complete {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.success-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+}
+
+.verification-complete p {
+    margin: 8px 0;
+    font-size: 1.1rem;
+    color: #1f2937;
+}
+
+.cooldown-info {
+    color: #6b7280;
+    font-size: 0.9rem;
+}
+
 @media (max-width: 768px) {
     .verification-cards {
         grid-template-columns: 1fr;
@@ -422,6 +602,16 @@
         margin: 10% auto;
         width: 95%;
     }
+    
+    .check-item {
+        flex-direction: column;
+        text-align: center;
+        gap: 12px;
+    }
+    
+    .verification-actions .btn {
+        padding: 12px;
+    }
 }
 </style>
 
@@ -430,17 +620,22 @@
 const locationModal = document.getElementById('locationModal');
 const pairingModal = document.getElementById('pairingModal');
 const closeBtns = document.querySelectorAll('.close');
+let selectedSessionId = null;
+let qrStream = null;
+let qrScanTimer = null;
 
 closeBtns.forEach(btn => {
     btn.onclick = function() {
         locationModal.style.display = 'none';
         pairingModal.style.display = 'none';
+        stopQRScanner();
     };
 });
 
 window.onclick = function(event) {
     if (event.target == locationModal) {
         locationModal.style.display = 'none';
+        stopQRScanner();
     }
     if (event.target == pairingModal) {
         pairingModal.style.display = 'none';
@@ -449,7 +644,7 @@ window.onclick = function(event) {
 
 // Cihaz eşleme
 document.getElementById('pairDeviceBtn')?.addEventListener('click', function() {
-    getMacAddress();
+    showDeviceKey();
     pairingModal.style.display = 'block';
 });
 
@@ -461,35 +656,314 @@ document.getElementById('cancelPairingBtn')?.addEventListener('click', function(
     pairingModal.style.display = 'none';
 });
 
-// Konum doğrulama
-document.getElementById('verifyLocationBtn')?.addEventListener('click', function() {
-    locationModal.style.display = 'block';
-    showStep(1);
+// Konum doğrulama - daha sağlam event listener
+document.addEventListener('DOMContentLoaded', function() {
+    const verifyBtn = document.getElementById('verifyLocationBtn');
+    if (verifyBtn) {
+        console.log('Konum doğrula butonu bulundu, event listener ekleniyor...');
+        verifyBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Konum doğrula butonuna tıklandı!');
+            startLocationVerification();
+        });
+    } else {
+        console.log('Konum doğrula butonu bulunamadı!');
+    }
 });
 
-document.getElementById('requestLocationBtn')?.addEventListener('click', function() {
-    requestLocationVerification();
+// Alternatif event listener (DOMContentLoaded beklemeksizin)
+document.getElementById('verifyLocationBtn')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    console.log('Konum doğrula butonuna tıklandı (alternatif listener)!');
+    startLocationVerification();
 });
 
-// MAC adresi alma
+document.querySelectorAll('.attendanceStartBtn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        console.log('🔥 Yoklamaya katıl butonuna tıklandı!');
+        console.log('📋 Buton elementi:', this);
+        console.log('📋 Buton classları:', this.className);
+        
+        try {
+            selectedSessionId = this.getAttribute('data-session-id');
+            console.log('📋 Session ID:', selectedSessionId);
+            
+            if (!selectedSessionId) {
+                console.error('❌ Session ID bulunamadı!');
+                showVerificationDialog('error', '❌ Hata', 'Session ID bulunamadı. Lütfen sayfayı yenileyin.');
+                return;
+            }
+            
+            // Butonun çalıştığını göstermek için geçici olarak değiştir
+            const originalText = this.innerHTML;
+            this.innerHTML = '⏳ Kontrol Ediliyor...';
+            this.disabled = true;
+            console.log('📋 Buton durumu güncellendi:', this.innerHTML);
+            
+            console.log('🔍 Cihaz eşleşmesi kontrolü başlıyor...');
+            // 1. Cihaz eşleşmesi kontrolü
+            const pairingRes = await fetch('/student/api/check-device-pairing');
+            const pairing = await pairingRes.json();
+            
+            if (pairing.success && pairing.required !== false && !pairing.has_pairing) {
+                showVerificationDialog('warning', '⚠️ Cihaz Eşleşmesi Gerekli', 'Yoklamaya katılmak için önce cihaz eşlemesi yapmalısınız.\n\nDoğrulamalar sayfasına yönlendiriliyorsunuz...');
+                setTimeout(() => {
+                    window.location.href = '/student/verifications';
+                }, 2000);
+                return;
+            }
+
+            // 2. Cihaz doğrulaması kontrolü (aynı cihaz mı?)
+            if (pairing.has_pairing) {
+                const validateRes = await fetch('/student/api/validate-device', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ device_id: await getOrCreateDeviceId() })
+                });
+                const validate = await validateRes.json();
+                
+                if (!validate.valid) {
+                    showVerificationDialog('error', '❌ Cihaz Uyuşmazlığı', 'Bu hesap size ait değil. Eşleşen cihaz farklı.\n\nSadece eşleşen cihazdan yoklamaya katılabilirsiniz.');
+                    return;
+                }
+            }
+
+            // 3. Konum doğrulaması kontrolü
+            const locationRes = await fetch('/student/api/check-location-verification');
+            const location = await locationRes.json();
+            
+            if (location.success && !location.verified) {
+                showVerificationDialog('warning', '📍 Konum Doğrulaması Gerekli', 'Yoklamaya katılmak için önce konum doğrulamanız gerekmektedir.\n\nDoğrulamalar sayfasına yönlendiriliyorsunuz...');
+                setTimeout(() => {
+                    window.location.href = '/student/verifications';
+                }, 2000);
+                return;
+            }
+
+            // Tüm kontroller başarılı, yoklama sayfasına yönlendir
+            showVerificationDialog('success', '✅ Doğrulama Başarılı', 'Tüm kontroller başarıyla tamamlandı. Yoklamaya yönlendiriliyorsunuz...');
+            
+            // 1 saniye bekle ve yoklama sayfasına yönlendir
+            setTimeout(() => {
+                window.location.href = `/student/attendance/${selectedSessionId}`;
+            }, 1000);
+            
+        } catch (error) {
+            console.error('❌ Yoklamaya katıl butonunda hata oluştu!');
+            console.error('🔍 Hata mesajı:', error.message);
+            console.error('🔍 Hata tipi:', error.name);
+            console.error('🔍 Hata stack:', error.stack);
+            console.error('🔍 Session ID:', selectedSessionId);
+            console.error('🔍 Buton element:', this);
+            
+            // Butonu eski haline getir
+            this.innerHTML = originalText;
+            this.disabled = false;
+            
+            // Detaylı hata mesajı göster
+            let errorMessage = 'Yoklamaya katılırken hata oluştu.\n\n';
+            errorMessage += `Hata: ${error.message}\n`;
+            errorMessage += `Tip: ${error.name}\n`;
+            errorMessage += `Session ID: ${selectedSessionId}\n\n`;
+            errorMessage += 'Console detayları için F12 tuşuna basın.';
+            
+            showVerificationDialog('error', '❌ Yoklama Hatası', errorMessage);
+            return;
+        }
+    });
+});
+
+// Sadece MAC adresi kullan (cihaz eşleşmesi için)
+async function getOrCreateDeviceId() {
+    const key = 'e_yoklama_device_id';
+    let deviceId = localStorage.getItem(key);
+    
+    if (!deviceId) {
+        // Önce MAC adresi almaya çalış
+        const macAddress = await getMacAddress();
+        
+        if (macAddress) {
+            deviceId = macAddress;
+            console.log('MAC address found for device ID:', deviceId);
+        } else {
+            // MAC adresi alınamazsa UUID kullan (fallback)
+            if (window.crypto && crypto.randomUUID) {
+                deviceId = crypto.randomUUID();
+            } else {
+                deviceId = String(Date.now()) + '-' + Math.random().toString(16).slice(2);
+            }
+            console.log('MAC address not found, using UUID:', deviceId);
+        }
+        
+        localStorage.setItem(key, deviceId);
+        console.log('New device ID created:', deviceId);
+    }
+    
+    return deviceId;
+}
+
+// Gelişmiş cihaz fingerprint'i oluşturma
+async function generateDeviceFingerprint() {
+    try {
+        const components = [];
+        
+        // Screen bilgileri
+        components.push(`screen:${screen.width}x${screen.height}x${screen.colorDepth}`);
+        components.push(`avail:${screen.availWidth}x${screen.availHeight}`);
+        
+        // Tarayıcı bilgileri
+        components.push(`ua:${navigator.userAgent.slice(0, 100)}`);
+        components.push(`lang:${navigator.language}`);
+        components.push(`platform:${navigator.platform}`);
+        
+        // Zaman dilimi
+        components.push(`tz:${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
+        
+        // WebGL fingerprint
+        const webgl = getWebGLFingerprint();
+        if (webgl) components.push(`webgl:${webgl}`);
+        
+        // Canvas fingerprint
+        const canvas = getCanvasFingerprint();
+        if (canvas) components.push(`canvas:${canvas}`);
+        
+        // MAC adresi (eğer alırsak)
+        const macAddress = await getMacAddress();
+        if (macAddress) components.push(`mac:${macAddress}`);
+        
+        // Bileşenleri hash'le
+        const fingerprint = components.join('|');
+        const hash = await simpleHash(fingerprint);
+        
+        console.log('Fingerprint components:', components.length);
+        console.log('Generated fingerprint:', hash);
+        
+        return hash;
+    } catch (error) {
+        console.error('Fingerprint generation error:', error);
+        return null;
+    }
+}
+
+// Basit hash fonksiyonu
+async function simpleHash(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash).toString(16);
+}
+
+// WebGL fingerprint
+function getWebGLFingerprint() {
+    try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (!gl) return null;
+        
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        if (!debugInfo) return null;
+        
+        const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+        const vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+        
+        return `${vendor}|${renderer}`.slice(0, 50);
+    } catch (error) {
+        return null;
+    }
+}
+
+// Canvas fingerprint
+function getCanvasFingerprint() {
+    try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = 200;
+        canvas.height = 50;
+        
+        ctx.textBaseline = 'top';
+        ctx.font = '14px Arial';
+        ctx.fillStyle = '#f60';
+        ctx.fillRect(125, 1, 62, 20);
+        ctx.fillStyle = '#069';
+        ctx.fillText('E-Yoklama Device Fingerprint', 2, 15);
+        ctx.fillStyle = 'rgba(102, 204, 0, 0.7)';
+        ctx.fillText('E-Yoklama Device Fingerprint', 4, 17);
+        
+        return canvas.toDataURL().slice(-50);
+    } catch (error) {
+        return null;
+    }
+}
+
+// MAC adresi alma fonksiyonu (tarayıcı sınırlamaları nedeniyle yaklaşık)
 async function getMacAddress() {
     try {
-        // MAC adresi alma (basit yöntem)
-        const macAddress = await fetch('/student/api/get-mac-address').then(res => res.text());
-        document.getElementById('macAddress').textContent = macAddress || 'Bilinmiyor';
+        // Önce localStorage'da mevcut MAC adresi var mı kontrol et
+        const storedMac = localStorage.getItem('e_yoklama_mac_address');
+        if (storedMac) {
+            console.log('Stored MAC address found:', storedMac);
+            return storedMac;
+        }
+        
+        // WebRTC kullanarak MAC adresi tahmini
+        const pc = new RTCPeerConnection({ iceServers: [] });
+        
+        return new Promise((resolve) => {
+            pc.createDataChannel('');
+            pc.createOffer()
+                .then(offer => pc.setLocalDescription(offer))
+                .then(() => {
+                    const lines = pc.localDescription.sdp.split('\n');
+                    console.log('SDP lines:', lines);
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('a=candidate:')) {
+                            const parts = line.split(' ');
+                            console.log('Candidate parts:', parts);
+                            if (parts.length > 4) {
+                                const candidate = parts[5];
+                                console.log('Candidate:', candidate);
+                                // MAC adresi formatını kontrol et
+                                if (candidate && candidate.match(/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/)) {
+                                    // MAC adresini localStorage'a kaydet
+                                    localStorage.setItem('e_yoklama_mac_address', candidate);
+                                    console.log('MAC address found and stored:', candidate);
+                                    pc.close();
+                                    return resolve(candidate);
+                                }
+                            }
+                        }
+                    }
+                    pc.close();
+                    console.log('No MAC address found in SDP');
+                    resolve(null);
+                })
+                .catch((error) => {
+                    console.error('WebRTC error:', error);
+                    pc.close();
+                    resolve(null);
+                });
+        });
     } catch (error) {
-        document.getElementById('macAddress').textContent = 'Alınamadı';
+        console.error('MAC address detection error:', error);
+        return null;
     }
 }
 
 // Cihaz eşleme
 async function pairDevice() {
     try {
+        const deviceId = await getOrCreateDeviceId();
         const response = await fetch('/student/api/pair-device', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-            }
+            },
+            body: JSON.stringify({ device_id: deviceId })
         });
         
         const result = await response.json();
@@ -505,6 +979,41 @@ async function pairDevice() {
     }
 }
 
+// Cihaz eşleşme doğrulaması
+async function validateDevicePairing() {
+    try {
+        const currentDeviceId = await getOrCreateDeviceId();
+        const response = await fetch('/student/api/validate-device', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ device_id: currentDeviceId })
+        });
+        
+        const result = await response.json();
+        console.log('Device validation result:', result);
+        
+        if (!result.valid) {
+            // Cihaz eşleşmesi varsa ama farklı cihazdan giriliyorsa
+            const pairingResponse = await fetch('/student/api/check-device-pairing');
+            const pairingData = await pairingResponse.json();
+            
+            if (pairingData.success && pairingData.has_pairing) {
+                alert('Bu hesap size ait değil. Eşleşen cihaz farklı. Lütfen eşleştiğiniz cihazdan giriş yapın.\n\nAlternatif: Cihaz eşleşmenizi sıfırlamak için yönetici ile iletişime geçin.');
+            } else {
+                alert('Bu hesap size ait değil. Eşleşen cihaz farklı. Sadece eşleşen cihazdan yoklamaya katılabilirsiniz.');
+            }
+            return false;
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Device validation error:', error);
+        return false;
+    }
+}
+
 // Konum doğrulama adımları
 function showStep(stepNumber) {
     document.querySelectorAll('.step').forEach(step => {
@@ -513,17 +1022,229 @@ function showStep(stepNumber) {
     document.getElementById('step' + stepNumber).classList.remove('hidden');
 }
 
-// Konum doğrulama isteği
-async function requestLocationVerification() {
-    showStep(2);
+// Cihaz eşleşme doğrulaması
+async function validateDevicePairing() {
+    try {
+        const currentDeviceId = await getOrCreateDeviceId();
+        const response = await fetch('/student/api/validate-device', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ device_id: currentDeviceId })
+        });
+        return await response.json();
+async function startLocationVerification() {
+    console.log('🚀 startLocationVerification fonksiyonu başlatıldı');
     
     try {
-        // Konum izni iste
+        console.log('📋 Doğrulama başlatılıyor dialog gösteriliyor...');
+        showVerificationDialog('info', '🔍 Doğrulama Başlatılıyor', 'Konum ve ağ doğrulaması yapılıyor...');
+        
+        // Cihaz eşleşmesi kontrolü
+        const devicePairing = {{ 'true' if device_pairing else 'false' }};
+        
+        if (!devicePairing) {
+            showVerificationDialog('error', '❌ Cihaz Eşleşmesi Gerekli', 'Konum doğrulaması için önce cihaz eşleştirmesi yapmanız gerekmektedir.\n\nLütfen önce cihaz eşleştirmesi yapın.');
+            return;
+        }
+        
+        // Cihaz doğrulaması
+        showVerificationDialog('info', '🔐 Cihaz Kontrol Ediliyor', 'Eşleşen cihaz doğrulanıyor...');
+        const deviceValidation = await validateDevicePairing();
+        
+        if (!deviceValidation.valid) {
+            showVerificationDialog('error', '❌ Cihaz Uyuşmazlığı', 'Bu hesap size ait değil. Eşleşen cihaz farklı.\n\nSadece eşleşen cihazdan yoklamaya katılabilirsiniz.\n\nAlternatif:\n- Eşleştiğiniz cihazdan giriş yapın\n- Yönetici ile iletişime geçin');
+            return;
+        }
+        
+        // Modal'ı göster
+        console.log('Modal gösteriliyor...');
+        const modal = document.getElementById('locationModal');
+        if (modal) {
+            modal.style.display = 'block';
+            modal.classList.add('show');
+            console.log('Modal görünürlüğü ayarlandı: block + show class');
+            
+            // Modal'ı ekranın ortasına getir
+            setTimeout(() => {
+                modal.style.opacity = '1';
+                modal.style.visibility = 'visible';
+                console.log('Modal tamamen görünür yapıldı');
+            }, 100);
+        } else {
+            console.error('Modal bulunamadı!');
+            alert('Konum doğrulama modalı bulunamadı!');
+            return;
+        }
+        
+        showStep(1);
+        console.log('Step 1 gösterildi');
+        
+        // Konum ve ağ kontrollerini aynı anda yap
+        showVerificationDialog('info', '📍 Konum Kontrol Ediliyor', 'Marmara Üniversitesi konumu ve Edurum ağı kontrol ediliyor...');
+        
+        // Konum ve ağ kontrollerini aynı anda yap
+        const [locationResult, networkResult] = await Promise.allSettled([
+            checkLocationVerification(),
+            checkNetworkVerification()
+        ]);
+        
+        const verificationResult = {
+            hasActiveVerification: false,
+            location: locationResult,
+            network: networkResult
+        };
+            
+            showStep(2);
+            
+            // Sonuçları göster
+            if (verificationResult.hasActiveVerification) {
+                // Zaten aktif doğrulama var
+                showActiveVerificationDialog(verificationResult.verification);
+            } else {
+                // Yeni doğrulama sonuçlarını göster
+                showVerificationResults(verificationResult.location, verificationResult.network);
+            }
+            
+        } catch (error) {
+            console.error('Doğrulama hatası:', error);
+            let errorMessage = 'Konum doğrulama sırasında hata oluştu.\n\n';
+            
+            if (error instanceof APIError) {
+                errorMessage += error.getUserFriendlyMessage();
+            } else {
+                errorMessage += error.message;
+            }
+            
+            showVerificationDialog('error', '❌ Doğrulama Hatası', errorMessage + '\n\nLütfen tekrar deneyin veya yönetici ile iletişime geçin.');
+        }
+        
+    } catch (error) {
+        console.error('❌ startLocationVerification fonksiyonunda hata oluştu!');
+        console.error('🔍 Hata mesajı:', error.message);
+        console.error('🔍 Hata tipi:', error.name);
+        console.error('🔍 Hata stack:', error.stack);
+        console.error('🔍 APIError mı?:', error instanceof APIError);
+        
+        let errorMessage = 'Konum doğrulama sırasında hata oluştu.\n\n';
+        errorMessage += `Hata: ${error.message}\n`;
+        errorMessage += `Tip: ${error.name}\n\n`;
+        
+        if (error instanceof APIError) {
+            console.log('📋 APIError detayı:', error.toLogFormat());
+            errorMessage += `API Hata Kodu: ${error.code}\n`;
+            errorMessage += `HTTP Durum: ${error.statusCode}\n`;
+        }
+        
+        errorMessage += 'Console detayları için F12 tuşuna basın.';
+        
+        showVerificationDialog('error', '❌ Doğrulama Hatası', errorMessage);
+    }
+}
+
+// Doğrulama sonuçlarını göster
+function showVerificationResults(locationResult, networkResult) {
+    // Konum kontrol sonucunu göster
+    const locationCheck = document.getElementById('locationCheck');
+    const locationIcon = document.getElementById('locationIcon');
+    const locationStatus = document.getElementById('locationStatus');
+    
+    // Konum sonucunu işle
+    let locationSuccess = false;
+    if (locationResult.status === 'fulfilled' && locationResult.value.success) {
+        const locationData = locationResult.value.data;
+        locationSuccess = locationData.status === 'verified' && locationData.in_campus;
+        
+        if (locationSuccess) {
+            locationCheck.classList.add('success');
+            locationCheck.classList.remove('error');
+            locationIcon.innerHTML = '✅';
+            locationStatus.textContent = 'Marmara Üniversitesi içinde olduğunuz doğrulandı.';
+        } else {
+            locationCheck.classList.add('error');
+            locationCheck.classList.remove('success');
+            locationIcon.innerHTML = '❌';
+            locationStatus.textContent = locationData.campus_name ? 
+                `${locationData.campus_name} dışındasınız (${locationData.distance_from_campus}m uzakta)` : 
+                'Konum doğrulanamadı';
+        }
+    } else {
+        locationCheck.classList.add('error');
+        locationCheck.classList.remove('success');
+        locationIcon.innerHTML = '❌';
+        locationStatus.textContent = 'Konum alınamadı';
+        
+        // Konum hatası için dialog göster
+        if (locationResult.status === 'rejected') {
+            showVerificationDialog('warning', '📍 Konum Alınamadı', 'GPS konumu alınamadı.\n\nÇözümler:\n- Konum servisini açın\n- Tarayıcıdan konum izni verin\n- Dışarıda deneyin');
+        }
+    }
+    
+    // Wi-Fi kontrol sonucunu göster
+    const wifiCheck = document.getElementById('wifiCheck');
+    const wifiIcon = document.getElementById('wifiIcon');
+    const wifiStatus = document.getElementById('wifiStatus');
+    
+    // Ağ sonucunu işle
+    let networkSuccess = false;
+    if (networkResult.status === 'fulfilled' && networkResult.value.success) {
+        const networkData = networkResult.value.data;
+        networkSuccess = networkData.status === 'verified' && networkData.is_trusted_network;
+        
+        if (networkSuccess) {
+            wifiCheck.classList.add('success');
+            wifiCheck.classList.remove('error');
+            wifiIcon.innerHTML = '✅';
+            wifiStatus.textContent = `Edurum Wi-Fi ağına bağlı olduğunuz doğrulandı. (${networkData.network_name || 'Bilinmeyen ağ'})`;
+        } else {
+            wifiCheck.classList.add('error');
+            wifiCheck.classList.remove('success');
+            wifiIcon.innerHTML = '❌';
+            wifiStatus.textContent = `Edurum Wi-Fi ağına bağlı değilsiniz. (${networkData.network_name || 'Bilinmeyen ağ'})`;
+        }
+    } else {
+        wifiCheck.classList.add('error');
+        wifiCheck.classList.remove('success');
+        wifiIcon.innerHTML = '❌';
+        wifiStatus.textContent = 'Ağ kontrol edilemedi';
+        
+        // Wi-Fi hatası için dialog göster
+        if (networkResult.status === 'rejected') {
+            showVerificationDialog('warning', '📶 Ağ Kontrol Edilemedi', 'Ağ bilgisi alınamadı.\n\nÇözümler:\n- İnternet bağlantınızı kontrol edin\n- Tarayıcıyı yenileyin\n- Farklı ağ deneyin');
+        }
+    }
+    
+    // Butonları oluştur
+    createVerificationButtons(locationSuccess, networkSuccess);
+}
+
+// Aktif doğrulama dialogunu göster
+function showActiveVerificationDialog(verification) {
+    const verificationData = verification.data;
+    const expiresAt = new Date(verificationData.expires_at);
+    const timeRemaining = Math.floor((expiresAt - new Date()) / 1000 / 60); // dakika
+    
+    showVerificationDialog('info', '✅ Doğrulama Mevcut', 
+        `Mevcut konum doğrulamanız geçerli!\n\n` +
+        `Doğrulama tipi: ${verificationData.verification_type}\n` +
+        `Kalan süre: ${timeRemaining} dakika\n` +
+        `Şüpheli: ${verificationData.is_suspicious ? 'Evet' : 'Hayır'}\n\n` +
+        `${timeRemaining > 0 ? '1 dakika içinde yoklamaya katılabilirsiniz.' : 'Doğrulama süresi dolmuş.'}`);
+    
+    // Modal'ı kapat
+    const modal = document.getElementById('locationModal');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('show');
+    }
+}
+
+// Konum doğrulama kontrolü (artık yeni API kullanılıyor)
+async function checkLocationVerification() {
+    try {
         const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject);
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
         });
         
-        // Konumu kontrol et
         const response = await fetch('/student/api/verify-location', {
             method: 'POST',
             headers: {
@@ -535,98 +1256,326 @@ async function requestLocationVerification() {
             })
         });
         
-        const result = await response.json();
-        
-        if (result.in_campus) {
-            // GPS başarılı
-            showStep(3);
-            document.getElementById('gpsSuccess').classList.remove('hidden');
-        } else {
-            // GPS başarısız, ağ kontrolü
-            checkNetworkVerification();
-        }
-        
+        return await response.json();
     } catch (error) {
-        // Konum izni verilmedi veya hata
-        checkNetworkVerification();
+        return { in_campus: false };
     }
 }
 
-// Ağ doğrulama kontrolü
+// Ağ doğrulama kontrolü - gerçek Wi-Fi adını kontrol eder
 async function checkNetworkVerification() {
     try {
-        // Ağ bilgisini al (basit SSID kontrolü)
-        const networkInfo = {
-            ssid: 'unknown', // Gerçek uygulamada WiFi API ile alınır
-            network_type: 'wifi'
-        };
+        // Önce client-side Wi-Fi adını kontrol et
+        const networkName = getWiFiNetworkName();
+        const isEdurum = networkName && networkName.toLowerCase().includes('edurum');
         
+        // Server-side kontrol de yap
         const response = await fetch('/student/api/verify-network', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(networkInfo)
+            body: JSON.stringify({
+                network_name: networkName
+            })
+        });
+        
+        const serverResult = await response.json();
+        
+        // Client-side kontrolü daha güvenilir kabul et
+        return {
+            is_trusted_network: isEdurum,
+            network_name: networkName,
+            server_result: serverResult.is_trusted_network
+        };
+    } catch (error) {
+        // Hata durumunda client-side kontrolü döndür
+        const networkName = getWiFiNetworkName();
+        const isEdurum = networkName && networkName.toLowerCase().includes('edurum');
+        
+        return {
+            is_trusted_network: isEdurum,
+            network_name: networkName,
+            server_result: false
+        };
+    }
+}
+
+// Wi-Fi ağ adını almak için fonksiyon
+function getWiFiNetworkName() {
+    // Network Information API (modern tarayıcılar)
+    if ('connection' in navigator) {
+        const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (connection) {
+            return connection.type === 'wifi' ? 'Wi-Fi' : connection.type;
+        }
+    }
+    
+    // Eğer tarayıcı Wi-Fi adını alamıyorsa, IP tabanlı tahmin
+    return 'Unknown';
+}
+
+// Doğrulama butonlarını oluştur
+function createVerificationButtons(locationResult, networkResult) {
+    const actionsContainer = document.getElementById('verificationActions');
+    actionsContainer.innerHTML = '';
+    
+    const locationSuccess = locationResult.status === 'fulfilled' && locationResult.value.in_campus;
+    const networkSuccess = networkResult.status === 'fulfilled' && networkResult.value.is_trusted_network;
+    
+    // En az biri başarılıysa - normal doğrulama
+    if (locationSuccess || networkSuccess) {
+        // Konum doğrulayarak devam et butonu (onay butonu)
+        const locationBtn = document.createElement('button');
+        locationBtn.className = 'btn btn-success';
+        locationBtn.innerHTML = '✅ Doğrulamayı Onayla';
+        locationBtn.onclick = () => completeVerification(true, false); // normal, şüpheli değil
+        actionsContainer.appendChild(locationBtn);
+        
+        // Başarılı doğrulama için bilgi mesajı
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'verification-info';
+        infoDiv.innerHTML = '✅ Doğrulama başarılı! Yoklamaya katılmak için onaylayın.';
+        actionsContainer.appendChild(infoDiv);
+    }
+    
+    // Hiçbiri başarılı değilse - şüpheli doğrulama
+    if (!locationSuccess && !networkSuccess) {
+        // Konum doğrulamadan devam et butonu (şüpheli)
+        const suspiciousBtn = document.createElement('button');
+        suspiciousBtn.className = 'btn btn-warning';
+        suspiciousBtn.innerHTML = '⚠️ Şüpheli Olarak Devam Et';
+        suspiciousBtn.onclick = () => completeVerification(false, true); // konumsuz, şüpheli
+        actionsContainer.appendChild(suspiciousBtn);
+        
+        // Şüpheli doğrulama için uyarı mesajı
+        const warningDiv = document.createElement('div');
+        warningDiv.className = 'verification-warning';
+        warningDiv.innerHTML = '⚠️ Konum ve ağ doğrulanamadı. Şüpheli olarak devam edebilirsiniz.';
+        actionsContainer.appendChild(warningDiv);
+    }
+    
+    // Manuel doğrulama butonu (her durumda)
+    const manualBtn = document.createElement('button');
+    manualBtn.className = 'btn btn-primary';
+    manualBtn.innerHTML = '📝 Manuel Doğrulama';
+    manualBtn.onclick = () => manualVerification();
+    actionsContainer.appendChild(manualBtn);
+}
+
+// Doğrulamayı tamamla
+async function completeVerification(withLocation = true, isSuspicious = false) {
+    try {
+        showVerificationDialog('info', '⏳ Doğrulama Kaydediliyor', 'Doğrulama bilgileri kaydediliyor...');
+        
+        let result;
+        
+        if (isSuspicious) {
+            // Şüpheli doğrulama için manuel doğrulama kullan
+            result = await VerificationAPI.manualVerification(
+                withLocation ? 'Location verification failed' : 'Network verification failed',
+                `with_location: ${withLocation}, is_suspicious: ${isSuspicious}`
+            );
+                    // Aktif yoklamaya katıl
+                    window.location.href = `/student/attendance/${selectedSessionId}`;
+                } else {
+                    location.reload();
+                }
+            }, 2000);
+        } else {
+            showVerificationDialog('error', '❌ Doğrulama Hatası', `Doğrulama başlatılamadı:\n\n${result.message}\n\nLütfen tekrar deneyin.`);
+        }
+    } catch (error) {
+        showVerificationDialog('error', '❌ Bağlantı Hatası', `Doğrulama sırasında bağlantı hatası oluştu:\n\n${error.message}\n\nLütfen internet bağlantınızı kontrol edin.`);
+    }
+}
+
+// Manuel doğrulama
+async function manualVerification() {
+    try {
+        showVerificationDialog('info', '📝 Manuel Doğrulama', 'Manuel doğrulama kaydediliyor...');
+
+        const response = await fetch('/student/api/manual-verification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
         });
         const result = await response.json();
-        
-        if (result.is_eduroam) {
-            // Eduroam başarılı
+
+        if (result.success) {
             showStep(3);
-            document.getElementById('networkSuccess').classList.remove('hidden');
+            showVerificationDialog('warning', '⚠️ Manuel Doğrulama', 'Manuel doğrulama yapıldı.\n\nBu doğrulama şüpheli olarak işaretlendi.\n\nÖğretmen onayından sonra yoklama geçerli olacaktır.');
+
+            setTimeout(() => {
+                locationModal.style.display = 'none';
+                if (selectedSessionId) {
+                    window.location.href = `/student/attendance/${selectedSessionId}`;
+                } else {
+                    location.reload();
+                }
+            }, 2000);
         } else {
-            // Manuel doğrulama
-            showStep(3);
-            document.getElementById('manualVerification').classList.remove('hidden');
+            showVerificationDialog('error', '❌ Manuel Doğrulama Hatası', `Manuel doğrulama başarısız:\n\n${result.message}\n\nLütfen tekrar deneyin.`);
         }
     } catch (error) {
-        // Manuel doğrulama
-        showStep(3);
-        document.getElementById('manualVerification').classList.remove('hidden');
+        showVerificationDialog('error', '❌ Manuel Doğrulama Hatası', `Manuel doğrulama sırasında hata oluştu:\n\n${error.message}\n\nLütfen tekrar deneyin.`);
     }
 }
 
-// Doğrulama kodu başlatma
-document.getElementById('continueToQRBtn')?.addEventListener('click', startVerification);
-document.getElementById('continueToQRBtn2')?.addEventListener('click', startVerification);
-document.getElementById('manualContinueBtn')?.addEventListener('click', startVerification);
+// Doğrulama dialog fonksiyonu
+function showVerificationDialog(type, title, message) {
+    // Modal'ı kapat
+    const modal = document.getElementById('locationModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
 
-async function startVerification() {
-    showStep(4);
+    // Dialog tipine göre icon ve stil belirle
+    let icon, bgColor, textColor;
+    switch(type) {
+        case 'success':
+            icon = '✅';
+            bgColor = '#d4edda';
+            textColor = '#155724';
+            break;
+        case 'error':
+            icon = '❌';
+            bgColor = '#f8d7da';
+            textColor = '#721c24';
+            break;
+        case 'warning':
+            icon = '⚠️';
+            bgColor = '#fff3cd';
+            textColor = '#856404';
+            break;
+        case 'info':
+            icon = 'ℹ️';
+            bgColor = '#d1ecf1';
+            textColor = '#0c5460';
+            break;
+        default:
+            icon = 'ℹ️';
+            bgColor = '#d1ecf1';
+            textColor = '#0c5460';
+    }
+
+    // Dialog HTML'i oluştur
+    const dialogHtml = `
+        <div id="verificationDialog" style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        ">
+            <div style="
+                background: white;
+                padding: 30px;
+                border-radius: 12px;
+                max-width: 500px;
+                width: 90%;
+                text-align: center;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+                animation: slideIn 0.3s ease;
+            ">
+                <div style="
+                    font-size: 3rem;
+                    margin-bottom: 20px;
+                ">${icon}</div>
+                <h3 style="
+                    color: ${textColor};
+                    margin-bottom: 15px;
+                    font-size: 1.3rem;
+                ">${title}</h3>
+                <p style="
+                    color: #6c757d;
+                    line-height: 1.6;
+                    white-space: pre-line;
+                    margin-bottom: 25px;
+                ">${message}</p>
+                <button onclick="closeVerificationDialog()" style="
+                    background: ${type === 'error' ? '#dc3545' : type === 'warning' ? '#ffc107' : type === 'success' ? '#28a745' : '#007bff'};
+                    color: ${type === 'warning' ? '#212529' : 'white'};
+                    border: none;
+                    padding: 12px 30px;
+                    border-radius: 6px;
+                    font-size: 1rem;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                ">Tamam</button>
+            </div>
+        </div>
+        <style>
+            @keyframes slideIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(-20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+        </style>
+    `;
+
+    // Dialog'u ekle
+    document.body.insertAdjacentHTML('beforeend', dialogHtml);
+}
+
+// Dialog'u kapat
+function closeVerificationDialog() {
+    const dialog = document.getElementById('verificationDialog');
+    if (dialog) {
+        dialog.remove();
+    }
+}
+
+// Konum doğrulama butonuna tıklama işleyicisi
+function handleLocationVerificationClick(event) {
+    event.preventDefault();
+    console.log('🔥 Konum doğrulama butonuna tıklandı!');
     
     try {
-        const response = await fetch('/student/api/start-verification');
-        const result = await response.json();
+        // Butonu geçici olarak devre dışı bırak
+        const button = event.target;
+        button.disabled = true;
+        button.textContent = '⏳ Kontrol Ediliyor...';
         
-        if (result.success) {
-            document.getElementById('currentCode').textContent = result.code;
-            startCountdown(60);
-        }
+        console.log('📋 startLocationVerification fonksiyonu çağrılıyor...');
+        
+        // Doğrulama fonksiyonunu çağır
+        startLocationVerification().finally(() => {
+            button.disabled = false;
+            button.textContent = '📍 Konum Doğrula';
+            console.log('✅ Konum doğrulama butonu eski haline getirildi');
+        });
+        
     } catch (error) {
-        alert('Doğrulama başlatılamadı: ' + error.message);
-    }
-}
-
-// Geri sayım
-function startCountdown(seconds) {
-    let remaining = seconds;
-    const countdownElement = document.getElementById('countdown');
-    
-    const timer = setInterval(() => {
-        remaining--;
-        countdownElement.textContent = remaining;
+        console.error('❌ Konum doğrulama butonunda hata:', error);
+        console.error('Hata detayı:', error.stack);
         
-        if (remaining <= 0) {
-            clearInterval(timer);
-            locationModal.style.display = 'none';
-            alert('Doğrulama süresi doldu!');
-        }
-    }, 1000);
+        // Butonu eski haline getir
+        const button = event.target;
+        button.disabled = false;
+        button.textContent = '📍 Konum Doğrula';
+        
+        // Hata mesajı göster
+        showVerificationDialog('error', '❌ Buton Hatası', `Konum doğrulama butonunda hata oluştu:\n\n${error.message}\n\nConsole detayları için F12 tuşuna basın.`);
+    }
 }
 
 // Kod gönderme
 document.getElementById('submitCodeBtn')?.addEventListener('click', async function() {
     const code = document.getElementById('codeInput').value;
+    if (!selectedSessionId) {
+        alert('Aktif yoklama seçilmedi.');
+        return;
+    }
     
     try {
         const response = await fetch('/student/api/submit-verification', {
@@ -634,13 +1583,13 @@ document.getElementById('submitCodeBtn')?.addEventListener('click', async functi
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ code: code })
+            body: JSON.stringify({ session_id: selectedSessionId, code: code })
         });
         
         const result = await response.json();
         
         if (result.success) {
-            alert('Doğrulama başarılı!');
+            alert(result.suspicious ? 'Yoklama şüpheli olarak öğretmen onayına gönderildi.' : 'Yoklama kaydınız doğrulandı.');
             locationModal.style.display = 'none';
             location.reload();
         } else {
@@ -663,12 +1612,501 @@ document.getElementById('stopScanBtn')?.addEventListener('click', function() {
 });
 
 function startQRScanner() {
-    // QR tarama başlatma (basit implementasyon)
-    alert('QR tarama özelliği tarayıcı desteği gerektirir.');
+    // Comprehensive browser compatibility ve güvenlik kontrolü
+    const browserInfo = {
+        name: getBrowserName(),
+        version: getBrowserVersion(),
+        supportsBarcodeDetector: 'BarcodeDetector' in window,
+        supportsGetUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+        isSecureContext: isSecureContext(),
+        hasCameraPermission: false,
+        cameraDevices: []
+    };
+    
+    console.log('Browser Info:', browserInfo);
+    
+    // 1. HTTPS ve güvenli context kontrolü
+    if (!browserInfo.isSecureContext) {
+        showBrowserCompatibilityError('insecure');
+        return;
+    }
+    
+    // 2. MediaDevices desteği kontrolü
+    if (!browserInfo.supportsGetUserMedia) {
+        showBrowserCompatibilityError('no-camera');
+        return;
+    }
+    
+    // 3. BarcodeDetector desteği kontrolü
+    if (!browserInfo.supportsBarcodeDetector) {
+        showBrowserCompatibilityError('no-barcode-detector');
+        return;
+    }
+    
+    // 4. Kamera cihazlarını kontrol et
+    navigator.mediaDevices.enumerateDevices()
+        .then(devices => {
+            browserInfo.cameraDevices = devices.filter(device => device.kind === 'videoinput');
+            
+            if (browserInfo.cameraDevices.length === 0) {
+                showBrowserCompatibilityError('no-camera-devices');
+                return;
+            }
+            
+            console.log('Kamera cihazları bulundu:', browserInfo.cameraDevices);
+            
+            // 5. Kamera izin durumunu kontrol et
+            return navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    facingMode: 'environment',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                } 
+            });
+        })
+        .then(stream => {
+            if (stream) {
+                browserInfo.hasCameraPermission = true;
+                stream.getTracks().forEach(track => track.stop()); // Test stream'ini kapat
+                
+                console.log('Tüm kontroller başarılı, QR taraması başlatılıyor...');
+                initializeQRScanner();
+            }
+        })
+        .catch(error => {
+            console.error('Kamera izni hatası:', error);
+            handleCameraPermissionError(error, browserInfo);
+        });
+}
+
+function getBrowserName() {
+    const userAgent = navigator.userAgent;
+    if (userAgent.indexOf('Chrome') > -1) return 'Chrome';
+    if (userAgent.indexOf('Firefox') > -1) return 'Firefox';
+    if (userAgent.indexOf('Safari') > -1) return 'Safari';
+    if (userAgent.indexOf('Edge') > -1) return 'Edge';
+    return 'Unknown';
+}
+
+function getBrowserVersion() {
+    const userAgent = navigator.userAgent;
+    const match = userAgent.match(/(Chrome|Firefox|Safari|Edge)\/(\d+)/);
+    return match ? match[2] : 'Unknown';
+}
+
+function isSecureContext() {
+    // HTTPS, localhost veya secure context kontrolü
+    return location.protocol === 'https:' || 
+           location.hostname === 'localhost' || 
+           location.hostname === '127.0.0.1' ||
+           location.hostname === '0.0.0.0' ||
+           window.isSecureContext;
+}
+
+function showBrowserCompatibilityError(errorType) {
+    const browserName = getBrowserName();
+    const browserVersion = getBrowserVersion();
+    
+    let title = 'QR Kod Taraması Sorunu';
+    let message = '';
+    let solutions = [];
+    
+    switch(errorType) {
+        case 'insecure':
+            message = 'QR kod taraması için güvenli bağlantı gereklidir.';
+            solutions = [
+                '1. HTTPS üzerinden siteye erişin (https://localhost:5000)',
+                '2. Localhost üzerinden erişin (http://localhost:5000)',
+                '3. Güvenli sertifika kurulumu yapın',
+                '4. Chrome\'da "Insecure origins treated as secure" ayarını kullanın'
+            ];
+            break;
+            
+        case 'no-camera':
+            message = 'Tarayıcınız kamera erişimini desteklemiyor.';
+            solutions = [
+                `1. ${browserName} tarayıcısını güncelleyin (mevcut: v${browserVersion})`,
+                '2. Farklı bir tarayıcı deneyin (Chrome, Firefox, Edge)',
+                '3. Tarayıcı ayarlarından kamera iznini kontrol edin',
+                '4. Cihazınızda kamera olduğundan emin olun'
+            ];
+            break;
+            
+        case 'no-camera-devices':
+            message = 'Sisteminizde kamera cihazı bulunamadı.';
+            solutions = [
+                '1. Kameranın takılı ve çalışır durumda olduğundan emin olun',
+                '2. Diğer uygulamaların kamerayı kullanmadığını kontrol edin',
+                '3. Cihazı yeniden başlatın',
+                '4. Farklı bir kamera deneyin (dış webcam)'
+            ];
+            break;
+            
+        case 'no-barcode-detector':
+            message = 'Tarayıcınız BarcodeDetector API\'sini desteklemiyor.';
+            solutions = [
+                `1. ${browserName} v${browserVersion} güncelleyin (BarcodeDetector v94+ gerektirir)`,
+                '2. Chrome 94+ veya Firefox 114+ kullanın',
+                '3. Alternatif QR kütüphanesi kullanın (aşağıda öneriler)',
+                '4. Safari kullanıyorsanız Chrome veya Firefox deneyin'
+            ];
+            break;
+    }
+    
+    let fullMessage = `${title}\n\n${message}\n\nÇözüm Önerileri:\n${solutions.join('\n')}\n\nAlternatif:\nKodu manuel olarak giriş alanına yazabilirsiniz.`;
+    
+    alert(fullMessage);
+    document.getElementById('qrScanner').classList.add('hidden');
+    
+    // Alternatif kütüphane önerileri
+    if (errorType === 'no-barcode-detector') {
+        suggestAlternativeLibraries();
+    }
+}
+
+function handleCameraPermissionError(error, browserInfo) {
+    let title = 'Kamera İzin Hatası';
+    let message = '';
+    let solutions = [];
+    
+    switch(error.name) {
+        case 'NotAllowedError':
+            message = 'Kamera izni reddedildi.';
+            solutions = [
+                '1. Tarayıcı adres çubuğundaki kamera ikonuna tıklayın',
+                '2. "İzin Ver" seçeneğini seçin',
+                '3. Sayfayı yenileyin ve tekrar deneyin',
+                '4. Tarayıcı ayarlarından kamera iznini kontrol edin'
+            ];
+            break;
+            
+        case 'NotFoundError':
+            message = 'Kamera cihazı bulunamadı.';
+            solutions = [
+                '1. Kameranın takılı ve çalışır durumda olduğundan emin olun',
+                '2. Diğer uygulamaların kamerayı kullanmadığını kontrol edin',
+                '3. Cihazı yeniden başlatın',
+                '4. Farklı bir kamera deneyin'
+            ];
+            break;
+            
+        case 'NotReadableError':
+            message = 'Kamera kullanılamıyor.';
+            solutions = [
+                '1. Başka bir uygulama kamerayı kullanıyor olabilir',
+                '2. Tarayıcıyı yeniden başlatın',
+                '3. Cihazı yeniden başlatın',
+                '4. Farklı bir tarayıcı deneyin'
+            ];
+            break;
+            
+        case 'OverconstrainedError':
+            message = 'Kamera ayarları desteklenmiyor.';
+            solutions = [
+                '1. Daha düşük çözünürlük deneyin',
+                '2. Farklı bir kamera kullanın',
+                '3. Tarayıcıyı güncelleyin',
+                '4. Cihazınızın bu özellikleri desteklediğinden emin olun'
+            ];
+            break;
+            
+        case 'SecurityError':
+            message = 'Güvenlik kısıtlamaları.';
+            solutions = [
+                '1. HTTPS bağlantısı kullanın',
+                '2. Localhost üzerinden erişin',
+                '3. Güvenli sertifika kurun',
+                '4. Chrome geliştirici ayarlarını kontrol edin'
+            ];
+            break;
+            
+        default:
+            message = `Bilinmeyen kamera hatası: ${error.name}`;
+            solutions = [
+                '1. Tarayıcıyı güncelleyin',
+                '2. Farklı bir tarayıcı deneyin',
+                '3. Cihazı yeniden başlatın',
+                '4. Manuel kod girişi kullanın'
+            ];
+    }
+    
+    let fullMessage = `${title}\n\n${message}\n\nÇözüm Önerileri:\n${solutions.join('\n')}\n\nTarayıcı: ${browserInfo.name} v${browserInfo.version}\nAlternatif:\nKodu manuel olarak giriş alanına yazabilirsiniz.`;
+    
+    alert(fullMessage);
+    document.getElementById('qrScanner').classList.add('hidden');
+}
+
+function suggestAlternativeLibraries() {
+    console.log('Alternatif QR kütüphaneleri öneriliyor...');
+    
+    // QR kütüphaneleri için öneriler
+    const alternatives = [
+        { 
+            name: 'jsQR', 
+            url: 'https://github.com/cozmo/jsQR', 
+            description: 'Canvas tabanlı QR okuma',
+            compatibility: 'Chrome, Firefox, Edge, Safari',
+            size: '~15KB',
+            features: ['No dependencies', 'Fast scanning', 'Canvas based']
+        },
+        { 
+            name: 'qr-scanner', 
+            url: 'https://github.com/ericblade/qr-scanner', 
+            description: 'WebRTC tabanlı QR okuma',
+            compatibility: 'Chrome, Firefox, Edge',
+            size: '~45KB',
+            features: ['WebRTC', 'Auto-focus', 'Continuous scanning']
+        },
+        { 
+            name: 'html5-qrcode', 
+            url: 'https://github.com/mebjas/html5-qrcode', 
+            description: 'QR kod oluşturma/okuma',
+            compatibility: 'Chrome, Firefox, Edge, Safari, Mobile',
+            size: '~200KB',
+            features: ['Mobile support', 'Multiple formats', 'File upload']
+        }
+    ];
+    
+    console.log('Önerilen kütüphaneler:', alternatives);
+    
+    // Alternatif kütüphane öneri mesajı
+    let libraryMessage = 'Alternatif QR Kütüphaneleri:\n\n';
+    alternatives.forEach((lib, index) => {
+        libraryMessage += `${index + 1}. ${lib.name}\n`;
+        libraryMessage += `   - ${lib.description}\n`;
+        libraryMessage += `   - Uyumluluk: ${lib.compatibility}\n`;
+        libraryMessage += `   - Boyut: ${lib.size}\n`;
+        libraryMessage += `   - Özellikler: ${lib.features.join(', ')}\n`;
+        libraryMessage += `   - URL: ${lib.url}\n\n`;
+    });
+    
+    libraryMessage += 'Not: Bu kütüphaneleri kullanmak için geliştirici tarafından entegrasyon gerekir.';
+    
+    alert(libraryMessage);
+    
+    // Alternatif kütüphane yükleme fonksiyonu (isteğe bağlı)
+    window.loadAlternativeQRScanner = function(libraryName) {
+        console.log(`${libraryName} yükleniyor...`);
+        // Burada dinamik kütüphane yükleme implement edilebilir
+        alert(`${libraryName} kütüphanesi yükleniyor...\nBu özellik geliştirici tarafından implement edilmelidir.`);
+    };
+    
+    // Manuel kod girişi önerisi
+    setTimeout(() => {
+        if (confirm('Alternatif olarak kodu manuel girmek ister misiniz?')) {
+            document.getElementById('codeInput').focus();
+            document.getElementById('qrScanner').classList.add('hidden');
+        }
+    }, 1000);
+}
+
+function initializeQRScanner() {
+    // Orijinal QR tarama mantığı buraya taşındı
+    const video = document.getElementById('qrVideo');
+    
+    // Kamera izni iste - daha detaylı hata ayıklama ile
+    navigator.mediaDevices.getUserMedia({ 
+        video: { 
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+        } 
+    })
+    .then(stream => {
+        console.log('Kamera izni alındı:', stream);
+    })
+    .catch(error => {
+        console.error('Kamera izni hatası:', error);
+        
+        let errorMessage = 'Kamera erişimi sağlanamadı. ';
+        
+        if (error.name === 'NotAllowedError') {
+            errorMessage += 'Kamera izni reddedildi. Lütfen tarayıcı ayarlarından kamera izni verin.';
+        } else if (error.name === 'NotFoundError') {
+            errorMessage += 'Kamera bulunamadı. Lütfen cihazınızda bir kamera olduğundan emin olun.';
+        } else if (error.name === 'NotReadableError') {
+            errorMessage += 'Kamera kullanılamıyor. Başka bir uygulama kamera kullanıyor olabilir.';
+        } else if (error.name === 'OverconstrainedError') {
+            errorMessage += 'Kamera ayarları desteklenmiyor. Cihazınız bu özellikleri desteklemiyor olabilir.';
+        } else if (error.name === 'SecurityError') {
+            errorMessage += 'Güvenlik kısıtlamaları nedeniyle kamera erişimi engellendi. HTTPS bağlantısı gerekebilir.';
+        } else {
+            errorMessage += `Hata kodu: ${error.name}. Lütfen tarayıcınızı güncelleyin veya farklı bir tarayıcı deneyin.`;
+        }
+        
+        alert(errorMessage);
+        stopQRScanner();
+    })
+    .then(async stream => {
+        qrStream = stream;
+        video.srcObject = stream;
+        
+        try {
+            await video.play();
+            
+            // BarcodeDetector'ı başlat
+            const detector = new BarcodeDetector({ formats: ['qr_code'] });
+            
+            // Tarama döngüsü
+            qrScanTimer = setInterval(async () => {
+                if (!video.videoWidth || !video.videoHeight) {
+                    return;
+                }
+                
+                try {
+                    const codes = await detector.detect(video);
+                    if (codes.length && codes[0].rawValue) {
+                        const qrCode = codes[0].rawValue.trim().toUpperCase();
+                        document.getElementById('codeInput').value = qrCode;
+                        
+                        // Otomatik gönderme seçeneği
+                        if (qrCode.length === 6) {
+                            stopQRScanner();
+                            // Otomatik olarak kodu gönder
+                            document.getElementById('submitCodeBtn').click();
+                        }
+                    }
+                } catch (error) {
+                    console.error('QR tarama hatası:', error);
+                }
+            }, 300);
+            
+        } catch (playError) {
+            console.error('Video oynatma hatası:', playError);
+            stopQRScanner();
+            alert('Kamera görüntüsü başlatılamadı. Lütfen kodu manuel olarak girin.');
+        }
+    });
+}
+    
+    // Kamera erişimini kontrol et
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Kamera erişimi desteklenmiyor. Lütfen kodu manuel olarak girin.');
+        document.getElementById('qrScanner').classList.add('hidden');
+        return;
+    }
+
+    const video = document.getElementById('qrVideo');
+    
+    // HTTPS kontrolü - localhost ve HTTPS için exception ekle
+    const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname === '0.0.0.0';
+    const isSecure = location.protocol === 'https:' || isLocalhost;
+    
+    if (!isSecure) {
+        alert('Kamera erişimi için güvenli bağlantı (HTTPS) gereklidir.\n\nÇözümler:\n1. HTTPS üzerinden siteye erişin\n2. Localhost (127.0.0.1) üzerinden erişin\n\nLütfen kodu manuel olarak girin.');
+        document.getElementById('qrScanner').classList.add('hidden');
+        return;
+    }
+    
+    // Kamera izni iste - daha detaylı hata ayıklama ile
+    navigator.mediaDevices.getUserMedia({ 
+        video: { 
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+        } 
+    })
+    .then(stream => {
+        console.log('Kamera izni alındı:', stream);
+    })
+    .catch(error => {
+        console.error('Kamera izni hatası:', error);
+        
+        let errorMessage = 'Kamera erişimi sağlanamadı. ';
+        
+        if (error.name === 'NotAllowedError') {
+            errorMessage += 'Kamera izni reddedildi. Lütfen tarayıcı ayarlarından kamera izni verin.';
+        } else if (error.name === 'NotFoundError') {
+            errorMessage += 'Kamera bulunamadı. Lütfen cihazınızda bir kamera olduğundan emin olun.';
+        } else if (error.name === 'NotReadableError') {
+            errorMessage += 'Kamera kullanılamıyor. Başka bir uygulama kamera kullanıyor olabilir.';
+        } else if (error.name === 'OverconstrainedError') {
+            errorMessage += 'Kamera ayarları desteklenmiyor. Cihazınız bu özellikleri desteklemiyor olabilir.';
+        } else if (error.name === 'SecurityError') {
+            errorMessage += 'Güvenlik kısıtlamaları nedeniyle kamera erişimi engellendi. HTTPS bağlantısı gerekebilir.';
+        } else {
+            errorMessage += `Hata kodu: ${error.name}. Lütfen tarayıcınızı güncelleyin veya farklı bir tarayıcı deneyin.`;
+        }
+        
+        alert(errorMessage);
+        stopQRScanner();
+    });
+        .then(async stream => {
+            qrStream = stream;
+            video.srcObject = stream;
+            
+            try {
+                await video.play();
+                
+                // BarcodeDetector'ı başlat
+                const detector = new BarcodeDetector({ formats: ['qr_code'] });
+                
+                // Tarama döngüsü
+                qrScanTimer = setInterval(async () => {
+                    if (!video.videoWidth || !video.videoHeight) {
+                        return;
+                    }
+                    
+                    try {
+                        const codes = await detector.detect(video);
+                        if (codes.length && codes[0].rawValue) {
+                            const qrCode = codes[0].rawValue.trim().toUpperCase();
+                            document.getElementById('codeInput').value = qrCode;
+                            
+                            // Otomatik gönderme seçeneği
+                            if (qrCode.length === 6) {
+                                stopQRScanner();
+                                // Otomatik olarak kodu gönder
+                                document.getElementById('submitCodeBtn').click();
+                            }
+                        }
+                    } catch (error) {
+                        console.error('QR tarama hatası:', error);
+                    }
+                }, 300);
+                
+            } catch (playError) {
+                console.error('Video oynatma hatası:', playError);
+                stopQRScanner();
+                alert('Kamera görüntüsü başlatılamadı. Lütfen kodu manuel olarak girin.');
+            }
+        })
+        .catch(error => {
+            console.error('Kamera erişim hatası:', error);
+            stopQRScanner();
+            
+            // Hata mesajını kullanıcı dostu yap
+            let errorMessage = 'Kamera açılamadı. ';
+            
+            if (error.name === 'NotAllowedError') {
+                errorMessage += 'Kamera iznini vermeniz gerekmektedir. Lütfen tarayıcı ayarlarından kamera iznini verin.';
+            } else if (error.name === 'NotFoundError') {
+                errorMessage += 'Cihazınızda kamera bulunamadı. Lütfen kodu manuel olarak girin.';
+            } else if (error.name === 'NotReadableError') {
+                errorMessage += 'Kamera başka bir uygulama tarafından kullanılıyor. Lütfen kodu manuel olarak girin.';
+            } else {
+                errorMessage += 'Lütfen kodu manuel olarak girin.';
+            }
+            
+            alert(errorMessage);
+            document.getElementById('qrScanner').classList.add('hidden');
+        });
 }
 
 function stopQRScanner() {
-    // QR taramayı durdurma
+    if (qrScanTimer) {
+        clearInterval(qrScanTimer);
+        qrScanTimer = null;
+    }
+    if (qrStream) {
+        qrStream.getTracks().forEach(track => track.stop());
+        qrStream = null;
+    }
+    const video = document.getElementById('qrVideo');
+    if (video) {
+        video.pause();
+        video.srcObject = null;
+    }
 }
 </script>
 {% endblock %}

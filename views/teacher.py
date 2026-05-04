@@ -10,10 +10,10 @@ from services import statistics_service, export_service
 from services.attendance_service import (
     get_active_session, start_session as attendance_start_session, get_session_by_id,
     is_code_expired, refresh_code, get_session_records,
-    get_suspicious_records, get_enrolled_count, end_session as attendance_end_session
+    get_suspicious_records, get_enrolled_count, end_session as attendance_end_session,
+    resolve_suspicious as attendance_resolve_suspicious,
 )
 from utils.qr_generator import generate_qr_base64
-import pandas as pd
 
 teacher_bp = Blueprint('teacher', __name__)
 
@@ -24,11 +24,6 @@ def dashboard():
     user_id = session['user']['id']
     my_courses = db.query(Course).filter(Course.teacher_id == user_id, Course.is_active == 1).all()
     
-    # Debug: Ders sayısını ve onay durumunu logla
-    print(f"Toplam ders: {len(my_courses)}")
-    for course in my_courses:
-        print(f"Ders: {course.name}, Onay: {course.teacher_approval}")
-
     active_sessions = {}
     for course in my_courses:
         active = get_active_session(course.id)
@@ -203,65 +198,38 @@ def course_schedule(course_id):
                     'course': course
                 })
         
-        # DataFrame oluştur - columlar günler, index saatler
-        days = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma']
-        time_slots = ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', 
-                      '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', 
+        days = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']
+        time_slots = ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+                      '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30',
                       '16:00', '16:30', '17:00', '17:30', '18:00', '18:30']
-        
-        # Tüm değerleri None olan DataFrame
-        schedule_df = pd.DataFrame(None, index=time_slots, columns=days)
-        
-        # Tüm ders değerlerini ders kodu olarak ekle
+
+        # {gün: {saat: ders_kodu}} şeklinde sözlük
+        schedule_data = {day: {slot: '' for slot in time_slots} for day in days}
+
         for item in all_schedules:
             s = item['schedule']
             course = item['course']
-            day_name = days[s.day_of_week] if s.day_of_week < len(days) else None
-            if day_name:
-                # Başlangıç ve bitiş saatlerini dakikaya çevir (güvenli parsing)
-                try:
-                    start_time_str = str(s.start_time) if s.start_time else "00:00"
-                    end_time_str = str(s.end_time) if s.end_time else "00:00"
-                    
-                    # Saat formatını kontrol et ve düzelt
-                    if ':' not in start_time_str:
-                        try:
-                            hour_val = int(float(start_time_str))
-                            start_time_str = f"{hour_val:02d}:00"
-                        except:
-                            start_time_str = "00:00"
-                    if ':' not in end_time_str:
-                        try:
-                            hour_val = int(float(end_time_str))
-                            end_time_str = f"{hour_val:02d}:00"
-                        except:
-                            end_time_str = "00:00"
-                    
-                    start_minutes = int(start_time_str[:2]) * 60 + int(start_time_str[3:5])
-                    end_minutes = int(end_time_str[:2]) * 60 + int(end_time_str[3:5])
-                    
-                    # Bu aralıktaki tüm time slot'ları doldur
-                    for time_slot in time_slots:
-                        try:
-                            slot_minutes = int(time_slot[:2]) * 60 + int(time_slot[3:5])
-                            if slot_minutes >= start_minutes and slot_minutes < end_minutes:
-                                current_value = schedule_df.at[time_slot, day_name]
-                                if pd.isna(current_value) or current_value == '':
-                                    schedule_df.at[time_slot, day_name] = course.code or 'KOD'
-                                else:
-                                    # Eğer zaten değer varsa, virgülle ayırarak ekle
-                                    schedule_df.at[time_slot, day_name] = f"{current_value}, {course.code or 'KOD'}"
-                        except Exception as e:
-                            # Saat parsing hatası olursa bu programı atla
-                            print(f"Saat parsing hatası - Course: {course.name}, Start: {s.start_time}, End: {s.end_time}, Error: {e}")
-                            continue
-                except Exception as e:
-                    # Saat parsing hatası olursa bu programı atla
-                    print(f"Saat parsing hatası - Course: {course.name}, Start: {s.start_time}, End: {s.end_time}, Error: {e}")
-                    continue
-        
-        # DataFrame'i JSON'a çevir
-        schedule_data = schedule_df.to_dict()
+            if s.day_of_week is None or s.day_of_week >= len(days):
+                continue
+            day_name = days[s.day_of_week]
+            try:
+                def _to_str(val):
+                    v = str(val) if val else '00:00'
+                    if ':' not in v:
+                        v = f"{int(float(v)):02d}:00"
+                    return v
+                start_str = _to_str(s.start_time)
+                end_str = _to_str(s.end_time)
+                start_min = int(start_str[:2]) * 60 + int(start_str[3:5])
+                end_min = int(end_str[:2]) * 60 + int(end_str[3:5])
+                for slot in time_slots:
+                    slot_min = int(slot[:2]) * 60 + int(slot[3:5])
+                    if start_min <= slot_min < end_min:
+                        cur = schedule_data[day_name][slot]
+                        code = course.code or 'KOD'
+                        schedule_data[day_name][slot] = f"{cur}, {code}" if cur else code
+            except Exception:
+                continue
         
         return render_template('teacher/schedule.html', 
                              course=course, 
@@ -317,11 +285,6 @@ def attendance_start():
         Course.teacher_id == user_id, 
         Course.is_active == 1
     ).all()
-    
-    # Debug: Ders sayısını ve onay durumunu logla
-    print(f"Yoklama için toplam ders: {len(teacher_courses)}")
-    for course in teacher_courses:
-        print(f"Yoklama Ders: {course.name}, Onay: {course.teacher_approval}")
     
     # Her dersin programını ve aktif oturumunu al
     courses_data = []
@@ -470,7 +433,7 @@ def resolve_suspicious(record_id):
     decision = request.form.get('decision', '').strip()
     note = request.form.get('note', '').strip() or None
 
-    record, error = attendance_service.resolve_suspicious(record_id, user_id, decision, note)
+    record, error = attendance_resolve_suspicious(record_id, user_id, decision, note)
     if error:
         flash(error, 'error')
         return redirect(url_for('teacher.dashboard'))
@@ -606,12 +569,15 @@ def statistics():
                     AttendanceRecord.student_id == student.id
                 ).all()
                 
-                # Devamsızlık sayısını hesapla
-                absence_count = len([ar for ar in attendance_records if ar.status == 'absent'])
+                total_sessions = db.query(AttendanceSession).filter_by(course_id=course_id).count()
+                present_statuses = statistics_service.PRESENT_STATUSES
+                present_count = len([ar for ar in attendance_records if ar.status in present_statuses])
+                suspicious_count = len([ar for ar in attendance_records if ar.status == 'suspicious'])
+                absence_count = max(total_sessions - present_count - suspicious_count, 0)
             except Exception as e:
                 attendance_records = []
                 absence_count = 0
-            total_sessions = len(attendance_records)
+                total_sessions = 0
             
             student_absences.append({
                 'student': student,
@@ -851,7 +817,73 @@ def edit_schedule(schedule_id):
         schedule.room = request.form.get('room')
         
         db.commit()
-        flash('Ders programı güncellendi.', 'success')
-        return redirect(url_for('teacher.course_details', course_id=schedule.course_id))
-    
-    return render_template('teacher/edit_schedule.html', schedule=schedule)
+        flash('Program başarıyla güncellendi.', 'success')
+        return redirect(url_for('teacher.schedule'))
+
+
+@teacher_bp.route('/approve_suspicious_attendance/<int:record_id>', methods=['POST'])
+@role_required(1)
+def approve_suspicious_attendance(record_id):
+    """Şüpheli yoklamayı onayla"""
+    try:
+        user_id = session['user']['id']
+        
+        # Yoklama kaydını bul
+        record = db.query(AttendanceRecord).filter_by(id=record_id).first()
+        if not record:
+            return jsonify({'success': False, 'message': 'Yoklama kaydı bulunamadı'}), 404
+        
+        # Öğretmenin kendi dersinin olduğunu kontrol et
+        session_info = db.query(AttendanceSession).join(Course).filter(
+            AttendanceSession.id == record.session_id,
+            Course.teacher_id == user_id
+        ).first()
+        
+        if not session_info:
+            return jsonify({'success': False, 'message': 'Bu derse yetkiniz yok'}), 403
+        
+        # Yoklamayı onayla
+        record.status = 'approved'
+        record.approved_by = user_id
+        record.approved_at = datetime.utcnow()
+        
+        db.commit()
+        
+        return jsonify({'success': True, 'message': 'Şüpheli yoklama başarıyla onaylandı'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@teacher_bp.route('/reject_suspicious_attendance/<int:record_id>', methods=['POST'])
+@role_required(1)
+def reject_suspicious_attendance(record_id):
+    """Şüpheli yoklamayı reddet"""
+    try:
+        user_id = session['user']['id']
+        
+        # Yoklama kaydını bul
+        record = db.query(AttendanceRecord).filter_by(id=record_id).first()
+        if not record:
+            return jsonify({'success': False, 'message': 'Yoklama kaydı bulunamadı'}), 404
+        
+        # Öğretmenin kendi dersinin olduğunu kontrol et
+        session_info = db.query(AttendanceSession).join(Course).filter(
+            AttendanceSession.id == record.session_id,
+            Course.teacher_id == user_id
+        ).first()
+        
+        if not session_info:
+            return jsonify({'success': False, 'message': 'Bu derse yetkiniz yok'}), 403
+        
+        # Yoklamayı reddet
+        record.status = 'rejected'
+        record.rejected_by = user_id
+        record.rejected_at = datetime.utcnow()
+        
+        db.commit()
+        
+        return jsonify({'success': True, 'message': 'Şüpheli yoklama başarıyla reddedildi'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500

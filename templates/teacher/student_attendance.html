@@ -34,32 +34,40 @@
                 {% for record in attendance_records %}
                 <tr class="{{ 'status-suspicious' if record.status == 'suspicious' }}">
                     <td>{{ record.session.started_at[:10] if record.session.started_at else '-' }}</td>
-                    <td>{{ record.session.session_code }}</td>
+                    <td>{{ record.submitted_code or '-' }}</td>
                     <td>
-                        {% if record.status == 'present' %}
+                        {% if record.status in ['verified', 'approved', 'manual'] %}
                             <span class="status-present">Var</span>
-                        {% elif record.status == 'absent' %}
-                            <span class="status-absent">Yok</span>
+                        {% elif record.status == 'rejected' %}
+                            <span class="status-absent">Reddedildi</span>
                         {% elif record.status == 'suspicious' %}
                             <span class="status-suspicious">Şüpheli</span>
                         {% else %}
-                            <span class="status-manual">Manuel</span>
+                            <span class="status-manual">{{ record.status }}</span>
                         {% endif %}
                     </td>
-                    <td>{{ record.created_at[:19] if record.created_at else '-' }}</td>
+                    <td>{{ record.submitted_at[:19] if record.submitted_at else '-' }}</td>
                     <td>{{ record.ip_address or '-' }}</td>
                     <td>
-                        {% if record.latitude and record.longitude %}
-                            {{ record.latitude }}, {{ record.longitude }}
+                        {% if record.gps_distance_m is not none %}
+                            {{ '%.1f'|format(record.gps_distance_m) }} m
                         {% else %}
                             -
                         {% endif %}
                     </td>
                     <td>
-                        {% if record.verification_status == 'verified' %}
+                        {% if record.ip_match != 0 and record.gps_match != 0 %}
                             <span class="verification-verified">Doğrulanmış</span>
-                        {% elif record.verification_status == 'suspicious' %}
+                        {% elif record.status == 'suspicious' %}
                             <span class="verification-suspicious">Şüpheli</span>
+                            <div class="suspicious-actions">
+                                <button class="btn btn-small btn-success" onclick="approveSuspiciousAttendance({{ record.id }})" title="Onayla">
+                                    ✅ Onayla
+                                </button>
+                                <button class="btn btn-small btn-danger" onclick="rejectSuspiciousAttendance({{ record.id }})" title="Reddet">
+                                    ❌ Reddet
+                                </button>
+                            </div>
                         {% else %}
                             <span class="verification-none">-</span>
                         {% endif %}
@@ -105,6 +113,74 @@
 .status-suspicious {
     background-color: rgba(243, 156, 18, 0.05);
 }
+
+.suspicious-actions {
+    margin-top: 5px;
+    display: flex;
+    gap: 5px;
+}
+
+.suspicious-actions .btn {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+</style>
+
+<script>
+// Şüpheli yoklamayı onayla
+function approveSuspiciousAttendance(recordId) {
+    if (!confirm('Bu şüpheli yoklamayı onaylamak istediğinize emin misiniz?')) {
+        return;
+    }
+    
+    fetch('/teacher/approve_suspicious_attendance/' + recordId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Şüpheli yoklama başarıyla onaylandı.');
+            location.reload();
+        } else {
+            alert('Hata: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Hata:', error);
+        alert('Bir hata oluştu: ' + error.message);
+    });
+}
+
+// Şüpheli yoklamayı reddet
+function rejectSuspiciousAttendance(recordId) {
+    if (!confirm('Bu şüpheli yoklamayı reddetmek istediğinize emin misiniz?')) {
+        return;
+    }
+    
+    fetch('/teacher/reject_suspicious_attendance/' + recordId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Şüpheli yoklama başarıyla reddedildi.');
+            location.reload();
+        } else {
+            alert('Hata: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Hata:', error);
+        alert('Bir hata oluştu: ' + error.message);
+    });
+}
+</script>
 
 .page-header {
     margin-bottom: 20px;
