@@ -1,6 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, UniqueConstraint
-from database import Base
-from utils.helpers import utcnow_str
+from database.session import Base, utcnow_str
 
 
 class Building(Base):

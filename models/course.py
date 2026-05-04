@@ -14,8 +14,8 @@ class Course(Base):
     department = Column(String(100), nullable=True)
     class_name = Column(String(50), nullable=True)
     semester = Column(String(30), nullable=True)
-    building_id = Column(Integer, nullable=True)  # Bina ID
-    classroom_id = Column(Integer, nullable=True)  # Sınıf ID
+    building_code = Column(String(1), nullable=True)  # A-H
+    classroom_code = Column(String(2), nullable=True)  # 01-19
     day_of_week = Column(Integer, nullable=True)  # 1-7 (Pazartesi-Pazar)
     start_time = Column(String(5), nullable=True)  # HH:MM format
     end_time = Column(String(5), nullable=True)  # HH:MM format
