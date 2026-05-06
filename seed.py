@@ -4,6 +4,7 @@ Kullanim: python3 seed.py
 """
 import os
 import sys
+from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -12,6 +13,8 @@ from database import db, init_db
 from database.session import Base, engine as _engine
 from models.user import User
 from models.course import Course, CourseStudent
+from models.attendance_record import AttendanceRecord
+from models.attendance_session import AttendanceSession
 from models.schedule import Schedule
 from utils.hashing import hash_password
 
@@ -134,6 +137,34 @@ def seed():
             room='D-301',
         ))
 
+        # Ogretmen panelinde supheli yoklama karar akisini test etmek icin aktif oturum.
+        demo_session = AttendanceSession(
+            course_id=c1.id,
+            teacher_id=t1.id,
+            current_code='DEMO01',
+            code_expires_at=(datetime.utcnow() + timedelta(minutes=10)).isoformat(),
+            code_refresh_seconds=10,
+            allowed_ip_prefix='192.168.',
+            latitude=40.9925,
+            longitude=29.0625,
+            radius_m=100,
+        )
+        db.add(demo_session)
+        db.flush()
+        db.add(AttendanceRecord(
+            session_id=demo_session.id,
+            student_id=students[0].id,
+            course_id=c1.id,
+            status='suspicious',
+            submitted_code='DEMO01',
+            ip_address='8.8.8.8',
+            ip_match=0,
+            gps_match=0,
+            gps_distance_m=1500,
+            override_used=1,
+            override_reason='Seed: konum veya ağ doğrulaması başarısız',
+        ))
+
         db.commit()
 
         # ==================== OZET ====================
@@ -154,6 +185,7 @@ def seed():
         print('  YZM301: Pazartesi 09:00-11:50 D-301')
         print('  VTY201: Carsamba 13:00-14:50 B-205')
         print('  ALG401: Persembe 10:00-12:50 D-301')
+        print('  YZM301 icin aktif DEMO01 yoklama oturumu ve 1 supheli kayit eklendi')
         print('\n============================')
 
 

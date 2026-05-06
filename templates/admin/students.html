@@ -129,7 +129,7 @@
                     {% endif %}
                 </td>
                 <td>
-                    <button class="btn btn-small btn-primary" onclick="openEditStudentModal('{{ s.id }}', '{{ s.username }}', '{{ s.email }}', '{{ s.student_number or '' }}', '{{ s.department or '' }}', '{{ s.class_name or '' }}')" title="Düzenle">
+                    <button class="btn btn-small btn-primary" onclick='openEditStudentModal({{ {"id": s.id, "username": s.username, "email": s.email, "student_number": s.student_number or "", "department": s.department or "", "class_name": s.class_name or ""}|tojson }})' title="Düzenle">
                         ✏️
                     </button>
                     <form method="POST" action="{{ url_for('admin.toggle_student', student_id=s.id) }}" style="display: inline;">
@@ -186,7 +186,13 @@ function toggleAddStudentForm() {
     form.style.display = form.style.display === 'none' ? 'block' : 'none';
 }
 
-function openEditStudentModal(studentId, username, email, studentNumber, department, className) {
+    function openEditStudentModal(student) {
+        const studentId = student.id;
+        const username = student.username || '';
+        const email = student.email || '';
+        const studentNumber = student.student_number || '';
+        const department = student.department || '';
+        const className = student.class_name || '';
     console.log('🔧 Öğrenci düzenleme modalı açılıyor...');
     console.log('📋 Öğrenci ID:', studentId);
     console.log('📋 Kullanıcı adı:', username);

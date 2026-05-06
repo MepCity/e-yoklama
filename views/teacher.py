@@ -439,9 +439,9 @@ def resolve_suspicious(record_id):
         return redirect(url_for('teacher.dashboard'))
 
     if record.status == 'approved':
-        flash('Şüpheli yoklama onaylandı.', 'success')
+        flash('Şüpheli yoklama var sayıldı.', 'success')
     else:
-        flash('Şüpheli yoklama reddedildi.', 'warning')
+        flash('Şüpheli yoklama yok sayıldı.', 'warning')
     return redirect(url_for('teacher.active_session', session_id=record.session_id))
 
 

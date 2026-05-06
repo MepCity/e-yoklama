@@ -616,6 +616,253 @@
 </style>
 
 <script>
+(function () {
+    var locationModal = document.getElementById('locationModal');
+    var pairingModal = document.getElementById('pairingModal');
+    var selectedSessionId = null;
+
+    function showMessage(message) {
+        alert(message);
+    }
+
+    function setStep(stepNumber) {
+        document.querySelectorAll('#locationSteps .step').forEach(function (step) {
+            step.classList.add('hidden');
+        });
+        var step = document.getElementById('step' + stepNumber);
+        if (step) {
+            step.classList.remove('hidden');
+        }
+    }
+
+    function getOrCreateDeviceId() {
+        var key = 'e_yoklama_device_id';
+        var deviceId = localStorage.getItem(key);
+        if (!deviceId) {
+            if (window.crypto && crypto.randomUUID) {
+                deviceId = crypto.randomUUID();
+            } else {
+                deviceId = String(Date.now()) + '-' + Math.random().toString(16).slice(2);
+            }
+            localStorage.setItem(key, deviceId);
+        }
+        return Promise.resolve(deviceId);
+    }
+
+    async function validateDevicePairing() {
+        var response = await fetch('/student/api/validate-device', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ device_id: await getOrCreateDeviceId() })
+        });
+        return response.json();
+    }
+
+    async function pairDevice() {
+        var response = await fetch('/student/api/pair-device', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ device_id: await getOrCreateDeviceId() })
+        });
+        var result = await response.json();
+        if (!result.success) {
+            showMessage('Eşleme hatası: ' + result.message);
+            return;
+        }
+        showMessage('Cihaz başarıyla eşlendi.');
+        location.reload();
+    }
+
+    async function ensureDeviceIsValid() {
+        var pairingResponse = await fetch('/student/api/check-device-pairing');
+        var pairing = await pairingResponse.json();
+        if (pairing.required !== false && !pairing.has_pairing) {
+            showMessage('Konum doğrulaması için önce cihaz eşlemesi yapmalısınız.');
+            return false;
+        }
+        if (pairing.has_pairing) {
+            var validation = await validateDevicePairing();
+            if (!validation.valid) {
+                showMessage(validation.message || 'Bu hesap sadece eşleşen cihazdan kullanılabilir.');
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function updateCheck(id, ok, text) {
+        var item = document.getElementById(id + 'Check');
+        var icon = document.getElementById(id + 'Icon');
+        var status = document.getElementById(id + 'Status');
+        if (item) {
+            item.classList.toggle('success', ok);
+            item.classList.toggle('error', !ok);
+        }
+        if (icon) {
+            icon.textContent = ok ? '✓' : '!';
+        }
+        if (status) {
+            status.textContent = text;
+        }
+    }
+
+    async function verifyGps() {
+        if (!navigator.geolocation) {
+            return { success: false, message: 'Tarayıcı konum desteği sağlamıyor.' };
+        }
+        try {
+            var position = await new Promise(function (resolve, reject) {
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: true,
+                    timeout: 8000,
+                    maximumAge: 0
+                });
+            });
+            var response = await fetch('/student/api/verify-location', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    accuracy: position.coords.accuracy
+                })
+            });
+            return response.json();
+        } catch (error) {
+            return { success: false, message: 'Konum izni alınamadı.' };
+        }
+    }
+
+    async function verifyNetwork() {
+        try {
+            var response = await fetch('/student/api/verify-network', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ network_name: 'Unknown' })
+            });
+            return response.json();
+        } catch (error) {
+            return { success: false, is_trusted_network: false };
+        }
+    }
+
+    async function startVerificationWindow(isSuspicious) {
+        var response = await fetch('/student/api/start-verification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ with_location: !isSuspicious, is_suspicious: isSuspicious })
+        });
+        var result = await response.json();
+        if (!result.success) {
+            showMessage('Doğrulama başlatılamadı: ' + result.message);
+            return false;
+        }
+        return true;
+    }
+
+    async function completeAsSuspicious() {
+        var response = await fetch('/student/api/manual-verification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        var result = await response.json();
+        if (!result.success) {
+            showMessage('Manuel doğrulama oluşturulamadı: ' + result.message);
+            return;
+        }
+        if (await startVerificationWindow(true)) {
+            setStep(3);
+            showMessage('Doğrulama şüpheli olarak kaydedildi. Yoklama kaydınız öğretmen kararına düşebilir.');
+            location.reload();
+        }
+    }
+
+    async function completeAsVerified() {
+        if (await startVerificationWindow(false)) {
+            setStep(3);
+            showMessage('Konum doğrulaması tamamlandı. Aktif yoklamaya katılabilirsiniz.');
+            location.reload();
+        }
+    }
+
+    async function startLocationVerification() {
+        if (!(await ensureDeviceIsValid())) {
+            return;
+        }
+        locationModal.style.display = 'block';
+        setStep(1);
+
+        var gpsResult = await verifyGps();
+        var networkResult = await verifyNetwork();
+        var gpsOk = Boolean(gpsResult.in_campus);
+        var networkOk = Boolean(networkResult.is_trusted_network);
+
+        setStep(2);
+        updateCheck('location', gpsOk, gpsOk ? 'Konum kampüs içinde doğrulandı.' : 'Konum doğrulanamadı.');
+        updateCheck('wifi', networkOk, networkOk ? 'Ağ güvenilir görünüyor.' : 'Ağ doğrulanamadı.');
+
+        var actions = document.getElementById('verificationActions');
+        actions.innerHTML = '';
+        var primary = document.createElement('button');
+        primary.className = gpsOk || networkOk ? 'btn btn-success' : 'btn btn-warning';
+        primary.textContent = gpsOk || networkOk ? 'Doğrulamayı Tamamla' : 'Şüpheli Olarak Devam Et';
+        primary.addEventListener('click', gpsOk || networkOk ? completeAsVerified : completeAsSuspicious);
+        actions.appendChild(primary);
+    }
+
+    async function submitAttendanceCode(sessionId) {
+        var code = prompt('Öğretmenin gösterdiği yoklama kodunu girin:');
+        if (!code) {
+            return;
+        }
+        if (!(await startVerificationWindow(false))) {
+            return;
+        }
+        var response = await fetch('/student/api/submit-verification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId, code: code.trim().toUpperCase() })
+        });
+        var result = await response.json();
+        if (!result.success) {
+            showMessage('Yoklama kaydedilemedi: ' + result.message);
+            return;
+        }
+        showMessage(result.suspicious ? 'Yoklama şüpheli olarak öğretmen onayına gönderildi.' : 'Yoklama kaydınız doğrulandı.');
+        location.reload();
+    }
+
+    document.querySelectorAll('.close').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            locationModal.style.display = 'none';
+            pairingModal.style.display = 'none';
+        });
+    });
+
+    document.getElementById('pairDeviceBtn')?.addEventListener('click', async function () {
+        document.getElementById('deviceKey').textContent = (await getOrCreateDeviceId()).slice(0, 18) + '...';
+        pairingModal.style.display = 'block';
+    });
+    document.getElementById('confirmPairingBtn')?.addEventListener('click', pairDevice);
+    document.getElementById('cancelPairingBtn')?.addEventListener('click', function () {
+        pairingModal.style.display = 'none';
+    });
+    document.getElementById('verifyLocationBtn')?.addEventListener('click', function (event) {
+        event.preventDefault();
+        startLocationVerification();
+    });
+    document.querySelectorAll('.attendanceStartBtn').forEach(function (button) {
+        button.addEventListener('click', async function () {
+            selectedSessionId = button.getAttribute('data-session-id');
+            if (await ensureDeviceIsValid()) {
+                submitAttendanceCode(selectedSessionId);
+            }
+        });
+    });
+}());
+</script>
+
+<script type="text/plain" data-disabled="legacy-verification-script">
 // Modal işlemleri
 const locationModal = document.getElementById('locationModal');
 const pairingModal = document.getElementById('pairingModal');

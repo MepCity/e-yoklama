@@ -275,7 +275,7 @@ def get_verification_status():
         user_id = session['user']['id']
         
         # Aktif doğrulamayı al
-        active_verification = LocationVerification.get_active_verification(user_id, db.session)
+        active_verification = LocationVerification.get_active_verification(user_id, db)
         
         if not active_verification:
             return create_standard_response(

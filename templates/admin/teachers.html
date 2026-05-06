@@ -56,7 +56,7 @@
                     {% endif %}
                 </td>
                 <td>
-                    <button class="btn btn-small btn-primary" onclick="openEditTeacherModal({{ t.id }}, '{{ t.username }}', '{{ t.email }}', '{{ t.branch or '' }}')" title="Düzenle">
+                    <button class="btn btn-small btn-primary" onclick='openEditTeacherModal({{ {"id": t.id, "username": t.username, "email": t.email, "branch": t.branch or ""}|tojson }})' title="Düzenle">
                         ✏️
                     </button>
                     <form method="POST" action="{{ url_for('admin.toggle_teacher', teacher_id=t.id) }}" style="display: inline;">
@@ -109,7 +109,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function openEditTeacherModal(teacherId, username, email, branch) {
+function openEditTeacherModal(teacher) {
+    const teacherId = teacher.id;
+    const username = teacher.username || '';
+    const email = teacher.email || '';
+    const branch = teacher.branch || '';
     // Modal oluştur
     const modal = document.createElement('div');
     modal.className = 'modal';

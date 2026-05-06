@@ -203,7 +203,7 @@
                     {% endif %}
                 </td>
                 <td>
-                    <button class="btn btn-small btn-primary" onclick="openEditCourseModal({{ c.id }}, '{{ c.name }}', '{{ c.code or '' }}', '{{ c.description or '' }}', {{ c.teacher_id or 'null' }}, '{{ c.department or '' }}', '{{ c.class_name or '' }}', '{{ c.building_code or '' }}', '{{ c.classroom_code or '' }}', {{ c.day_of_week or 'null' }}, '{{ c.start_time or '' }}', '{{ c.end_time or '' }}')" title="Düzenle">
+                    <button class="btn btn-small btn-primary" onclick='openEditCourseModal({{ {"id": c.id, "name": c.name, "code": c.code or "", "description": c.description or "", "teacher_id": c.teacher_id, "department": c.department or "", "class_name": c.class_name or "", "building_code": c.building_code or "", "classroom_code": c.classroom_code or "", "day_of_week": c.day_of_week, "start_time": c.start_time or "", "end_time": c.end_time or ""}|tojson }})' title="Düzenle">
                         ✏️
                     </button>
                     <form method="POST" action="{{ url_for('admin.toggle_course', course_id=c.id) }}" style="display: inline;">
@@ -407,7 +407,19 @@ function updateClassrooms() {
     }
 }
 
-function openEditCourseModal(courseId, name, code, description, teacherId, department, className, buildingCode, classroomCode, dayOfWeek, startTime, endTime) {
+function openEditCourseModal(course) {
+    const courseId = course.id;
+    const name = course.name || '';
+    const code = course.code || '';
+    const description = course.description || '';
+    const teacherId = course.teacher_id;
+    const department = course.department || '';
+    const className = course.class_name || '';
+    const buildingCode = course.building_code || '';
+    const classroomCode = course.classroom_code || '';
+    const dayOfWeek = course.day_of_week;
+    const startTime = course.start_time || '';
+    const endTime = course.end_time || '';
     // Modal oluştur
     const modal = document.createElement('div');
     modal.className = 'modal';

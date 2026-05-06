@@ -227,17 +227,12 @@ def pair_device():
         user = db.query(User).filter_by(id=user_id).first()
         data = request.get_json(silent=True) or {}
         
-        print(f"DEBUG PAIR: User ID: {user_id}")
-        print(f"DEBUG PAIR: Device ID from client: {data.get('device_id')}")
-        print(f"DEBUG PAIR: User-Agent: {request.headers.get('User-Agent')}")
-        
         if not user or not user.student_number:
             return jsonify({'success': False, 'message': 'Öğrenci numarası bulunamadı'}), 400
         
         # Cihaz ID'sini gizli anahtar ile şifrele
         encrypted_device_key = _encrypt_device_id(data.get('device_id'), request.headers.get('User-Agent'))
-        print(f"DEBUG PAIR: Encrypted device key: {encrypted_device_key}")
-        
+
         if not encrypted_device_key:
             return jsonify({'success': False, 'message': 'Geçerli cihaz anahtarı alınamadı'}), 400
         
@@ -262,13 +257,10 @@ def pair_device():
         new_pairing = DevicePairing(user_id, encrypted_device_key, user.student_number)
         db.add(new_pairing)
         db.commit()
-        
-        print(f"DEBUG PAIR: New pairing created with encrypted MAC: {encrypted_device_key}")
-        
+
         return jsonify({'success': True, 'message': 'Cihaz başarıyla eşlendi'})
         
     except Exception as e:
-        print(f"DEBUG PAIR: Exception: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
@@ -363,7 +355,7 @@ def manual_verification():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
-@student_bp.route('/api/start-verification', methods=['POST'])
+@student_bp.route('/api/start-verification', methods=['GET', 'POST'])
 @role_required(2)
 def start_verification():
     """Doğrulama kodu başlat"""
@@ -387,14 +379,11 @@ def start_verification():
                 # Konumsuz doğrulama - şüpheli olarak işaretle
                 new_verification = LocationVerification(
                     user_id=user_id,
+                    verification_type='manual',
                     latitude=0.0,
                     longitude=0.0,
-                    network_name='Unknown',
-                    is_suspicious=True,
-                    is_trusted_network=False,
-                    in_campus=False,
-                    created_at=datetime.now()
                 )
+                new_verification.manual_verify()
                 db.add(new_verification)
                 db.commit()
                 active_verification = new_verification
@@ -427,10 +416,6 @@ def validate_device():
         data = request.get_json(silent=True) or {}
         device_id = data.get('device_id')
         
-        print(f"DEBUG: User ID: {user_id}")
-        print(f"DEBUG: Device ID from client: {device_id}")
-        print(f"DEBUG: User-Agent: {request.headers.get('User-Agent')}")
-        
         if not device_id:
             return jsonify({'valid': False, 'message': 'Cihaz bilgisi alınamadı'}), 400
         
@@ -438,27 +423,17 @@ def validate_device():
         active_pairing = DevicePairing.get_active_pairing(user_id, db)
         
         if not active_pairing:
-            print("DEBUG: No active pairing found")
             return jsonify({'valid': False, 'message': 'Bu hesap için aktif cihaz eşleşmesi bulunamadı'})
-        
-        print(f"DEBUG: Active pairing MAC: {active_pairing.mac_address}")
-        
-        # Mevcut cihazın şifrelenmiş anahtarını oluştur ve karşılaştır
-        current_device_hash = _encrypt_device_id(device_id, request.headers.get('User-Agent'))
-        print(f"DEBUG: Current device hash: {current_device_hash}")
-        print(f"DEBUG: Stored hash: {active_pairing.mac_address}")
-        
+
         # Güvenli hash karşılaştırması yap
         is_valid = _verify_device_id(device_id, request.headers.get('User-Agent'), active_pairing.mac_address)
-        print(f"DEBUG: Hash verification result: {is_valid}")
-        
+
         if not is_valid:
             return jsonify({'valid': False, 'message': 'Bu hesap size ait değil. Eşleşen cihaz farklı.'})
         
         return jsonify({'valid': True, 'message': 'Cihaz doğrulaması başarılı'})
         
     except Exception as e:
-        print(f"DEBUG: Exception in validate_device: {e}")
         return jsonify({'valid': False, 'message': str(e)}), 500
 
 
@@ -486,17 +461,12 @@ def check_device_pairing():
 def check_location_verification():
     """Konum doğrulama durumunu kontrol et"""
     try:
-        print(f"DEBUG: check-location-verification API çağrıldı")
         user_id = session['user']['id']
-        print(f"DEBUG: User ID: {user_id}")
-        
+
         # Son konum doğrulamasını kontrol et
-        print(f"DEBUG: get_latest_verification çağrılıyor...")
         verification = LocationVerification.get_latest_verification(user_id, db)
-        print(f"DEBUG: Verification sonucu: {verification}")
-        
+
         if not verification:
-            print(f"DEBUG: Hiç doğrulama bulunamadı")
             return jsonify({
                 'success': True,
                 'verified': False,
@@ -505,8 +475,7 @@ def check_location_verification():
         
         # Doğrulamanın geçerliliğini kontrol et (1 saat içinde geçerli)
         from datetime import datetime, timedelta
-        print(f"DEBUG: Verification verified_at: {verification.verified_at}")
-        
+
         # verified_at string ise datetime'a çevir
         if isinstance(verification.verified_at, str):
             try:
@@ -517,14 +486,12 @@ def check_location_verification():
             created_dt = verification.verified_at
             
         if created_dt < datetime.now() - timedelta(hours=1):
-            print(f"DEBUG: Doğrulama süresi dolmuş")
             return jsonify({
                 'success': True,
                 'verified': False,
                 'message': 'Konum doğrulamasının süresi dolmuş'
             })
         
-        print(f"DEBUG: Doğrulama geçerli")
         return jsonify({
             'success': True,
             'verified': True,
@@ -532,9 +499,6 @@ def check_location_verification():
         })
         
     except Exception as e:
-        print(f"DEBUG: check-location-verification hatası: {e}")
-        import traceback
-        print(f"DEBUG: Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'message': str(e)}), 500
         
     except Exception as e:

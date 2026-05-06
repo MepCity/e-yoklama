@@ -9,7 +9,7 @@ class DevicePairing(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
-    mac_address = Column(String(17), nullable=False, unique=True)  # Geriye uyumlu alan: tarayıcı cihaz anahtarı
+    mac_address = Column(String(64), nullable=False, unique=True)  # Geriye uyumlu alan: tarayıcı cihaz anahtarı
     student_number = Column(String(20), nullable=False, index=True)
     
     # Eşleme zamanları
