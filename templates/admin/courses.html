@@ -6,6 +6,7 @@
 <div class="card">
     <h3>Yeni Ders Oluştur</h3>
     <form method="POST" action="{{ url_for('admin.create_course') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-row">
             <div class="form-group">
                 <label>Mevcut Ders Seçimi</label>
@@ -129,6 +130,7 @@
 <div class="card">
     <h3>Derse Öğrenci Ekle</h3>
     <form method="POST" action="{{ url_for('admin.add_student_to_course') }}" class="form-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
             <select name="course_id" required>
                 <option value="">Ders Seçiniz</option>
@@ -207,6 +209,7 @@
                         ✏️
                     </button>
                     <form method="POST" action="{{ url_for('admin.toggle_course', course_id=c.id) }}" style="display: inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-small {{ 'btn-danger' if c.is_active == 1 else 'btn-success' }}" 
                                 onclick="return confirm('Dersi {% if c.is_active == 1 %}pasife{% else %}aktife{% endif %} almak istediğinize emin misiniz?')">
                             {% if c.is_active == 1 %}Pasif Yap{% else %}Aktif Yap{% endif %}
@@ -299,44 +302,7 @@ function filterTeachersByFaculty() {
         {% endfor %}
     ];
     
-    // Fakülte-bölüm eşleştirmesi
-    const facultyDepartments = {
-        'Mühendislik Fakültesi': [
-            'Bilgisayar Mühendisliği',
-            'Yazılım Mühendisliği', 
-            'Elektrik-Elektronik Mühendisliği',
-            'Makine Mühendisliği',
-            'İnşaat Mühendisliği',
-            'Endüstri Mühendisliği',
-            'Kimya Mühendisliği',
-            'Çevre Mühendisliği',
-            'Gıda Mühendisliği'
-        ],
-        'Tıp Fakültesi': [
-            'Tıp',
-            'Diş Hekimliği',
-            'Eczacılık'
-        ],
-        'Sağlık Bilimleri Fakültesi': [
-            'Hemşirelik',
-            'Fizyoterapi ve Rehabilitasyon'
-        ],
-        'Eğitim Fakültesi': [
-            'Psikolojik Danışmanlık ve Rehberlik'
-        ],
-        'Fen Edebiyat Fakültesi': [
-            'Psikoloji',
-            'Moleküler Biyoloji ve Genetik'
-        ],
-        'Hukuk Fakültesi': [
-            'Hukuk'
-        ],
-        'İktisadi ve İdari Bilimler Fakültesi': [
-            'İşletme',
-            'İktisat',
-            'Uluslararası Ticaret ve Finans'
-        ]
-    };
+    const facultyDepartments = {{ faculty_departments|tojson }};
     
     // Seçilen dersin fakültesini bul
     let selectedFaculty = null;
@@ -694,44 +660,7 @@ function populateFromExistingCourse() {
 }
 
 function showFacultyDepartments() {
-    // Fakülte-bölüm verileri
-    const facultyDepartments = {
-        'Mühendislik Fakültesi': [
-            'Bilgisayar Mühendisliği',
-            'Yazılım Mühendisliği', 
-            'Elektrik-Elektronik Mühendisliği',
-            'Makine Mühendisliği',
-            'İnşaat Mühendisliği',
-            'Endüstri Mühendisliği',
-            'Kimya Mühendisliği',
-            'Çevre Mühendisliği',
-            'Gıda Mühendisliği'
-        ],
-        'Tıp Fakültesi': [
-            'Tıp',
-            'Diş Hekimliği',
-            'Eczacılık'
-        ],
-        'Sağlık Bilimleri Fakültesi': [
-            'Hemşirelik',
-            'Fizyoterapi ve Rehabilitasyon'
-        ],
-        'Eğitim Fakültesi': [
-            'Psikolojik Danışmanlık ve Rehberlik'
-        ],
-        'Fen Edebiyat Fakültesi': [
-            'Psikoloji',
-            'Moleküler Biyoloji ve Genetik'
-        ],
-        'Hukuk Fakültesi': [
-            'Hukuk'
-        ],
-        'İktisadi ve İdari Bilimler Fakültesi': [
-            'İşletme',
-            'İktisat',
-            'Uluslararası Ticaret ve Finans'
-        ]
-    };
+    const facultyDepartments = {{ faculty_departments|tojson }};
     
     // Modal oluştur
     const modal = document.createElement('div');

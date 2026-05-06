@@ -26,6 +26,7 @@
                         <td>{{ course.class_name or '-' }}</td>
                         <td>
                             <form method="POST" action="{{ url_for('teacher.approve_course', course_id=course.id) }}" style="display: inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" name="action" value="approve" class="btn btn-success btn-small" 
                                         onclick="return confirm('{{ course.name }} dersini onaylamak istediğinize emin misiniz?')">
                                     Onayla

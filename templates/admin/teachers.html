@@ -6,6 +6,7 @@
 <div class="card">
     <h3>Yeni Öğretmen Ekle</h3>
     <form method="POST" action="{{ url_for('admin.add_teacher') }}" class="form-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
             <input type="text" name="username" required placeholder="Kullanıcı adı">
         </div>
@@ -60,6 +61,7 @@
                         ✏️
                     </button>
                     <form method="POST" action="{{ url_for('admin.toggle_teacher', teacher_id=t.id) }}" style="display: inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-small {{ 'btn-danger' if t.is_active == 1 else 'btn-success' }}" 
                                 onclick="return confirm('Öğretmeni {% if t.is_active == 1 %}pasife{% else %}aktife{% endif %} almak istediğinize emin misiniz?')">
                             {% if t.is_active == 1 %}Pasif Yap{% else %}Aktif Yap{% endif %}

@@ -38,6 +38,7 @@
                         </td>
                         <td>
                             <form method="POST" action="{{ url_for('admin.approve_student', cs_id=cs.id) }}" style="display: inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" name="action" value="approve" class="btn btn-success btn-small" 
                                         onclick="return confirm('{{ cs.student.username }} öğrencisinin ders kaydını onaylamak istediğinize emin misiniz?')">
                                     Onayla

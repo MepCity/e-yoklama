@@ -5,23 +5,7 @@ from models.attendance_record import AttendanceRecord
 from models.attendance_session import AttendanceSession
 from models.course import Course, CourseStudent
 from models.user import User
-
-
-PRESENT_STATUSES = ('verified', 'approved', 'manual')
-def _rate(part, total):
-    return round((part / total * 100), 1) if total else 0
-
-
-def _status_counts(records):
-    counts = Counter(record.status for record in records)
-    return {
-        'verified': counts.get('verified', 0),
-        'approved': counts.get('approved', 0),
-        'manual': counts.get('manual', 0),
-        'suspicious': counts.get('suspicious', 0),
-        'rejected': counts.get('rejected', 0),
-    }
-
+from services.constants import PRESENT_STATUSES, rate
 
 def _course_expected_count(course_id):
     session_count = db.query(AttendanceSession).filter_by(course_id=course_id).count()
@@ -48,7 +32,7 @@ def _course_summary(course):
         'rejected': rejected,
         'missed': missed,
         'absent': absent,
-        'rate': _rate(present, expected),
+        'rate': rate(present, expected),
         'session_count': session_count,
         'enrolled_count': enrolled_count,
     }
@@ -89,7 +73,7 @@ def get_admin_statistics():
         'rejected_count': rejected_count,
         'missed_count': missed_count,
         'absent_count': absent_count,
-        'attendance_rate': _rate(verified_count, total_expected),
+        'attendance_rate': rate(verified_count, total_expected),
         'dept_stats': sorted(dept_counts.items()),
         'course_stats': course_stats,
         'status_chart': {
@@ -160,7 +144,7 @@ def get_student_statistics(student_id):
             'rejected': rejected,
             'missed': missed,
             'absent': absent,
-            'rate': _rate(present, expected),
+            'rate': rate(present, expected),
         }
 
         total_expected += expected
@@ -178,7 +162,7 @@ def get_student_statistics(student_id):
         'rejected': total_rejected,
         'missed': total_missed,
         'absent': total_absent,
-        'rate': _rate(total_present, total_expected),
+        'rate': rate(total_present, total_expected),
         'course_stats': course_stats,
         'chart_data': {
             'labels': ['Katılım', 'Şüpheli', 'Reddedilen', 'Girilmemiş'],

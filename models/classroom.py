@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Boolean, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, UniqueConstraint, ForeignKey
+from sqlalchemy.orm import relationship
 from database.session import Base, utcnow_str
 
 
@@ -19,7 +20,7 @@ class Classroom(Base):
     __tablename__ = 'classrooms'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    building_id = Column(Integer, nullable=False)  # Foreign key Building
+    building_id = Column(Integer, ForeignKey('buildings.id'), nullable=False)
     classroom_code = Column(String(10), nullable=False)  # Z01-Z09, 101-109
     classroom_name = Column(String(100), nullable=False)  # Z01 Laboratuvar, 101 Derslik
     capacity = Column(Integer, nullable=True)  # Kapasite
@@ -29,6 +30,7 @@ class Classroom(Base):
     __table_args__ = (
         UniqueConstraint('building_id', 'classroom_code', name='uq_building_classroom'),
     )
+    building = relationship('Building')
 
     def __repr__(self):
         return f'<Classroom {self.classroom_code}: {self.classroom_name}>'

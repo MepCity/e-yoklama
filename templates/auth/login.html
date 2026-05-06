@@ -16,6 +16,7 @@
     <!-- Giriş Formu -->
     <div id="login" class="tab-content active">
         <form method="POST" action="{{ url_for('auth.login') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
                 <label for="login-username">Kullanıcı Adı</label>
                 <input type="text" id="login-username" name="username" required placeholder="Kullanıcı adınız">
@@ -31,6 +32,7 @@
     <!-- Kayıt Formu -->
     <div id="register" class="tab-content">
         <form method="POST" action="{{ url_for('auth.register') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
                 <label for="reg-username">Kullanıcı Adı *</label>
                 <input type="text" id="reg-username" name="username" required placeholder="Kullanıcı adınız">

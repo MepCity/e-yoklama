@@ -7,6 +7,7 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-gizli-anahtar-uretimde-degistir')
     SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.join(BASE_DIR, 'e_yoklama.db')}"
+    MAX_CONTENT_LENGTH = 4 * 1024 * 1024
 
     # QR Kod Ayarları (FR-04, NFR-01)
     QR_REFRESH_SECONDS = 10
@@ -31,6 +32,21 @@ class Config:
     SESSION_TIMEOUT_MINUTES = 30
     PERMANENT_SESSION_LIFETIME = timedelta(minutes=SESSION_TIMEOUT_MINUTES)
     SESSION_REFRESH_EACH_REQUEST = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() == 'true'
+    CSRF_ENABLED = os.environ.get('CSRF_ENABLED', 'true').lower() == 'true'
+    SOCKETIO_CORS_ALLOWED_ORIGINS = [
+        origin.strip()
+        for origin in os.environ.get('SOCKETIO_CORS_ALLOWED_ORIGINS', '').split(',')
+        if origin.strip()
+    ]
+    SECURITY_HEADERS = {
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'SAMEORIGIN',
+        'Referrer-Policy': 'strict-origin-when-cross-origin',
+        'Permissions-Policy': 'camera=(self), geolocation=(self)',
+    }
 
     # Devamsızlık Uyarı Eşiği (FR-17)
     ABSENCE_WARNING_THRESHOLD = 0.80
@@ -49,6 +65,7 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     DEBUG = False
     SECRET_KEY = os.environ.get('SECRET_KEY')
+    SESSION_COOKIE_SECURE = True
 
 
 class TestConfig(Config):
@@ -56,6 +73,7 @@ class TestConfig(Config):
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     RATELIMIT_ENABLED = False
     REQUIRE_DEVICE_PAIRING = True
+    CSRF_ENABLED = False
 
 
 config = {

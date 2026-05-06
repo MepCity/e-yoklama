@@ -26,6 +26,7 @@
 <div id="add-student-form" class="form-panel" style="display: none;">
     <h3>Yeni Öğrenci Ekle</h3>
     <form method="POST" action="{{ url_for('admin.add_student') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-row">
             <div class="form-group">
                 <label>Kullanıcı Adı *</label>
@@ -133,6 +134,7 @@
                         ✏️
                     </button>
                     <form method="POST" action="{{ url_for('admin.toggle_student', student_id=s.id) }}" style="display: inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-small {{ 'btn-danger' if s.is_active == 1 else 'btn-success' }}" 
                                 onclick="return confirm('Öğrenciyi {% if s.is_active == 1 %}pasife{% else %}aktife{% endif %} almak istediğinize emin misiniz?')">
                             {% if s.is_active == 1 %}Pasif Yap{% else %}Aktif Yap{% endif %}

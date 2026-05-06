@@ -9,6 +9,7 @@ import logging
 
 from models.location_verification import LocationVerification
 from database import db
+from utils.decorators import role_required
 
 # Blueprint oluştur
 verification_bp = Blueprint('verification', __name__, url_prefix='/api/v1/verifications')
@@ -48,12 +49,55 @@ def validate_device_pairing(user_id):
 def calculate_expiry_time(verification_type="normal"):
     """Doğrulama bitiş zamanını hesapla"""
     if verification_type == "suspicious":
-        return datetime.utcnow() + timedelta(minutes=30)
-    return datetime.utcnow() + timedelta(hours=1)
+        expiry = datetime.utcnow() + timedelta(minutes=30)
+    else:
+        expiry = datetime.utcnow() + timedelta(hours=1)
+    return expiry.strftime('%Y-%m-%d %H:%M:%S')
+
+
+def _parse_dt(value):
+    if isinstance(value, datetime):
+        return value
+    if not value:
+        return None
+    for fmt in ('%Y-%m-%d %H:%M:%S',):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            pass
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _dt_iso(value):
+    parsed = _parse_dt(value)
+    return parsed.isoformat() if parsed else None
+
+
+def _seconds_remaining(expires_at):
+    parsed = _parse_dt(expires_at)
+    if not parsed:
+        return 0
+    return max(0, int((parsed - datetime.utcnow()).total_seconds()))
+
+
+def _verification_details(verification):
+    is_network = verification.verification_type == 'network'
+    is_gps = verification.verification_type == 'gps'
+    return {
+        'in_campus': bool(is_gps and verification.verified),
+        'is_trusted_network': bool(is_network and verification.verified),
+        'network_name': verification.network_info if is_network else None,
+        'campus_name': verification.campus_name,
+        'distance_from_campus': verification.distance_from_campus,
+    }
 
 # --- API Endpoints ---
 
 @verification_bp.route('/location', methods=['POST'])
+@role_required(2)
 def create_location_verification():
     """
     Konum doğrulaması oluştur
@@ -85,7 +129,7 @@ def create_location_verification():
         longitude = data.get('longitude')
         accuracy = data.get('accuracy')
         
-        if not latitude or not longitude:
+        if latitude is None or longitude is None:
             return create_standard_response(
                 success=False,
                 error="VALIDATION_ERROR",
@@ -105,11 +149,11 @@ def create_location_verification():
         response_data = {
             'verification_id': verification.id,
             'status': 'verified' if verification.verified else 'failed',
-            'in_campus': verification.in_campus,
+            'in_campus': bool(verification.verified),
             'campus_name': verification.campus_name,
             'distance_from_campus': verification.distance_from_campus,
             'is_suspicious': verification.is_suspicious,
-            'expires_at': verification.expires_at.isoformat(),
+            'expires_at': _dt_iso(verification.expires_at),
             'coordinates': {
                 'latitude': verification.latitude,
                 'longitude': verification.longitude,
@@ -127,16 +171,16 @@ def create_location_verification():
         )
         
     except Exception as e:
-        logger.error(f"Location verification error: {str(e)}")
+        logger.exception("Location verification error")
         return create_standard_response(
             success=False,
             error="INTERNAL_ERROR",
             message="Konum doğrulaması sırasında hata oluştu",
-            details={'error': str(e)},
             status_code=500
         )
 
 @verification_bp.route('/network', methods=['POST'])
+@role_required(2)
 def create_network_verification():
     """
     Ağ doğrulaması oluştur
@@ -164,7 +208,7 @@ def create_network_verification():
         # Ağ doğrulaması oluştur
         verification = LocationVerification(user_id, 'network')
         verification.verify_network(remote_addr)
-        verification.network_name = network_name
+        verification.network_info = network_name or remote_addr
         verification.expires_at = calculate_expiry_time('suspicious' if verification.is_suspicious else 'normal')
         
         db.add(verification)
@@ -173,16 +217,16 @@ def create_network_verification():
         # Response data
         response_data = {
             'verification_id': verification.id,
-            'status': 'verified' if verification.is_trusted_network else 'failed',
-            'is_trusted_network': verification.is_trusted_network,
-            'is_eduroam': verification.is_trusted_network and 'eduroam' in network_name.lower(),
+            'status': 'verified' if verification.verified else 'failed',
+            'is_trusted_network': bool(verification.verified),
+            'is_eduroam': bool(verification.verified and 'eduroam' in network_name.lower()),
             'network_name': network_name,
             'network_info': {
                 'remote_address': remote_addr,
                 'network_type': 'wifi'
             },
             'is_suspicious': verification.is_suspicious,
-            'expires_at': verification.expires_at.isoformat()
+            'expires_at': _dt_iso(verification.expires_at)
         }
         
         logger.info(f"Network verification created for user {user_id}: {verification.id}")
@@ -195,16 +239,16 @@ def create_network_verification():
         )
         
     except Exception as e:
-        logger.error(f"Network verification error: {str(e)}")
+        logger.exception("Network verification error")
         return create_standard_response(
             success=False,
             error="INTERNAL_ERROR",
             message="Ağ doğrulaması sırasında hata oluştu",
-            details={'error': str(e)},
             status_code=500
         )
 
 @verification_bp.route('/manual', methods=['POST'])
+@role_required(2)
 def create_manual_verification():
     """
     Manuel doğrulama oluştur
@@ -243,7 +287,7 @@ def create_manual_verification():
             'is_suspicious': True,
             'reason': reason,
             'notes': notes,
-            'expires_at': verification.expires_at.isoformat()
+            'expires_at': _dt_iso(verification.expires_at)
         }
         
         logger.info(f"Manual verification created for user {user_id}: {verification.id}")
@@ -256,16 +300,16 @@ def create_manual_verification():
         )
         
     except Exception as e:
-        logger.error(f"Manual verification error: {str(e)}")
+        logger.exception("Manual verification error")
         return create_standard_response(
             success=False,
             error="INTERNAL_ERROR",
             message="Manuel doğrulama sırasında hata oluştu",
-            details={'error': str(e)},
             status_code=500
         )
 
 @verification_bp.route('/status', methods=['GET'])
+@role_required(2)
 def get_verification_status():
     """
     Aktif doğrulama durumunu kontrol et
@@ -294,15 +338,11 @@ def get_verification_status():
             'verification_id': active_verification.id,
             'verification_type': active_verification.verification_type,
             'status': 'verified' if active_verification.verified else 'failed',
-            'verified_at': active_verification.verified_at.isoformat(),
-            'expires_at': active_verification.expires_at.isoformat(),
+            'verified_at': _dt_iso(active_verification.verified_at),
+            'expires_at': _dt_iso(active_verification.expires_at),
             'is_suspicious': active_verification.is_suspicious,
-            'time_remaining': (active_verification.expires_at - datetime.utcnow()).total_seconds(),
-            'details': {
-                'in_campus': active_verification.in_campus,
-                'is_trusted_network': active_verification.is_trusted_network,
-                'network_name': active_verification.network_name
-            }
+            'time_remaining': _seconds_remaining(active_verification.expires_at),
+            'details': _verification_details(active_verification)
         }
         
         return create_standard_response(
@@ -313,16 +353,16 @@ def get_verification_status():
         )
         
     except Exception as e:
-        logger.error(f"Verification status check error: {str(e)}")
+        logger.exception("Verification status check error")
         return create_standard_response(
             success=False,
             error="INTERNAL_ERROR",
             message="Doğrulama durumu kontrol edilirken hata oluştu",
-            details={'error': str(e)},
             status_code=500
         )
 
 @verification_bp.route('/history', methods=['GET'])
+@role_required(2)
 def get_verification_history():
     """
     Doğrulama geçmişini al
@@ -337,7 +377,7 @@ def get_verification_history():
         verification_type = request.args.get('type', None)
         
         # Doğrulama geçmişini al
-        query = LocationVerification.query.filter_by(user_id=user_id)
+        query = db.query(LocationVerification).filter_by(user_id=user_id)
         
         if verification_type:
             query = query.filter_by(verification_type=verification_type)
@@ -351,16 +391,10 @@ def get_verification_history():
                     'verification_id': v.id,
                     'verification_type': v.verification_type,
                     'status': 'verified' if v.verified else 'failed',
-                    'verified_at': v.verified_at.isoformat(),
-                    'expires_at': v.expires_at.isoformat() if v.expires_at else None,
+                    'verified_at': _dt_iso(v.verified_at),
+                    'expires_at': _dt_iso(v.expires_at),
                     'is_suspicious': v.is_suspicious,
-                    'details': {
-                        'in_campus': v.in_campus,
-                        'is_trusted_network': v.is_trusted_network,
-                        'network_name': v.network_name,
-                        'campus_name': v.campus_name,
-                        'distance_from_campus': v.distance_from_campus
-                    }
+                    'details': _verification_details(v)
                 }
                 for v in verifications
             ],
@@ -379,11 +413,10 @@ def get_verification_history():
         )
         
     except Exception as e:
-        logger.error(f"Verification history error: {str(e)}")
+        logger.exception("Verification history error")
         return create_standard_response(
             success=False,
             error="INTERNAL_ERROR",
             message="Doğrulama geçmişi alınırken hata oluştu",
-            details={'error': str(e)},
             status_code=500
         )

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from flask import Flask, redirect, url_for, session, render_template, request, flash, send_from_directory
+from flask import Flask, redirect, url_for, session, render_template, request, flash, send_from_directory, abort
 from flask_socketio import SocketIO
 from config import config
 
@@ -12,6 +12,8 @@ def create_app(config_name='development'):
     app.config.from_object(config[config_name])
     if not app.config.get('SECRET_KEY'):
         raise RuntimeError('SECRET_KEY ortam değişkeni production için zorunludur.')
+    if config_name == 'production' and app.config.get('DEVICE_PAIRING_SECRET') == 'e-yoklama-device-pairing-dev':
+        raise RuntimeError('DEVICE_PAIRING_SECRET ortam değişkeni production için zorunludur.')
 
     # Rate limiting
     from utils.rate_limit import limiter
@@ -22,7 +24,11 @@ def create_app(config_name='development'):
     init_db(app)
 
     # SocketIO
-    socketio.init_app(app, cors_allowed_origins='*')
+    cors_origins = app.config.get('SOCKETIO_CORS_ALLOWED_ORIGINS')
+    if cors_origins:
+        socketio.init_app(app, cors_allowed_origins=cors_origins)
+    else:
+        socketio.init_app(app)
     from sockets.attendance_socket import register_socket_events
     register_socket_events(socketio)
 
@@ -59,6 +65,13 @@ def create_app(config_name='development'):
     @app.route('/sw.js')
     def service_worker():
         return send_from_directory(app.root_path, 'sw.js', mimetype='application/javascript')
+
+    @app.before_request
+    def enforce_csrf():
+        from utils.security import validate_csrf
+        if not validate_csrf():
+            abort(403)
+        return None
 
     @app.before_request
     def enforce_session_timeout():
@@ -98,14 +111,21 @@ def create_app(config_name='development'):
     def too_many_requests(error):
         return render_template('errors/429.html'), 429
 
+    @app.after_request
+    def set_security_headers(response):
+        from utils.security import security_headers
+        return security_headers(response)
+
     # Template context - tum template'lerde kullanilabilir helper'lar
     from utils.helpers import day_name, format_datetime, format_date, STATUS_LABELS, STATUS_COLORS
+    from utils.security import csrf_token
     app.jinja_env.globals.update(
         day_name=day_name,
         format_datetime=format_datetime,
         format_date=format_date,
         STATUS_LABELS=STATUS_LABELS,
         STATUS_COLORS=STATUS_COLORS,
+        csrf_token=csrf_token,
     )
 
     return app

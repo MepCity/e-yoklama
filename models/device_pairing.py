@@ -91,5 +91,4 @@ class DevicePairing(Base):
         for pairing in expired_pairings:
             pairing.is_active = False
         
-        db_session.commit()
         return len(expired_pairings)

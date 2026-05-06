@@ -9,16 +9,7 @@ from models.attendance_record import AttendanceRecord
 from models.attendance_session import AttendanceSession
 from models.course import Course, CourseStudent
 from models.user import User
-
-PRESENT_STATUSES = ('verified', 'approved', 'manual')
-
-STATUS_TR = {
-    'verified': 'Doğrulandı',
-    'approved': 'Onaylandı',
-    'manual': 'Manuel',
-    'suspicious': 'Şüpheli',
-    'rejected': 'Reddedildi',
-}
+from services.constants import PRESENT_STATUSES, STATUS_TR, rate
 
 
 def _clean_date(value):
@@ -80,10 +71,6 @@ def _auto_width(ws):
             if cell.value:
                 max_len = max(max_len, len(str(cell.value)))
         ws.column_dimensions[col_letter].width = min(max_len + 3, 40)
-
-
-def _rate(part, total):
-    return round((part / total * 100), 1) if total else 0
 
 
 def export_course_attendance(course_id):
@@ -169,7 +156,7 @@ def export_course_attendance(course_id):
             present,
             suspicious,
             absent,
-            _rate(present, session_count),
+            rate(present, session_count),
         ])
 
     _auto_width(ws2)
@@ -224,7 +211,7 @@ def export_all_courses():
             present,
             suspicious,
             absent,
-            _rate(present, expected),
+            rate(present, expected),
         ])
 
     _auto_width(ws_summary)
@@ -268,7 +255,7 @@ def export_all_courses():
                 present,
                 suspicious,
                 absent,
-                _rate(present, session_count),
+                rate(present, session_count),
             ])
 
         _auto_width(ws)

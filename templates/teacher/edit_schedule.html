@@ -15,6 +15,7 @@
 <div class="card">
     <h3>Program Bilgileri</h3>
     <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-row">
             <div class="form-group">
                 <label for="day_of_week">Gün</label>

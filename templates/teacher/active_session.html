@@ -35,6 +35,7 @@
 <div class="qr-settings-section">
     <h3>QR Ayarları</h3>
     <form method="POST" action="{{ url_for('teacher.update_refresh_rate', session_id=att_session.id) }}" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="setting-group">
             <label>QR Yenileme Süresi (saniye)</label>
             <input type="number" name="refresh_seconds" value="{{ att_session.code_refresh_seconds }}" min="1" max="60" class="form-control">
@@ -47,6 +48,7 @@
 
 <div class="action-center">
     <form method="POST" action="{{ url_for('teacher.end_session', session_id=att_session.id) }}" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-danger" onclick="return confirm('Yoklama oturumunu sonlandırmak istediğinize emin misiniz?')">Oturumu Sonlandır</button>
     </form>
 </div>
@@ -99,6 +101,7 @@
                 <td>{{ format_datetime(r.submitted_at) }}</td>
                 <td>
                     <form method="POST" action="{{ url_for('teacher.resolve_suspicious', record_id=r.id) }}" class="form-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="text" name="note" placeholder="Not" aria-label="İnceleme notu">
                         <button type="submit" name="decision" value="approve" class="btn btn-small btn-primary">Var Say</button>
                         <button type="submit" name="decision" value="reject" class="btn btn-small btn-danger">Yok Say</button>

@@ -14,3 +14,19 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 5000);
     });
 });
+
+(function () {
+    var originalFetch = window.fetch;
+    window.fetch = function (input, init) {
+        init = init || {};
+        var method = (init.method || 'GET').toUpperCase();
+        if (!['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method)) {
+            var tokenMeta = document.querySelector('meta[name="csrf-token"]');
+            if (tokenMeta) {
+                init.headers = new Headers(init.headers || {});
+                init.headers.set('X-CSRF-Token', tokenMeta.getAttribute('content'));
+            }
+        }
+        return originalFetch(input, init);
+    };
+}());

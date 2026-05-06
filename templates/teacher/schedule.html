@@ -7,6 +7,7 @@
 <div class="card">
     <h3>Yeni Ders Saati Ekle</h3>
     <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-row">
             <div class="form-group">
                 <label>Gün *</label>
@@ -74,6 +75,7 @@
 <div class="card">
     <h3>Yoklama Başlat</h3>
     <form method="POST" action="{{ url_for('teacher.start_session', course_id=course.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-row">
             <div class="form-group">
                 <label>Ders Saati</label>

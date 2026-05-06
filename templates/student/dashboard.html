@@ -73,6 +73,7 @@
 </div>
 
 <form id="offlineAttendanceForm" method="POST" data-offline-attendance="1" hidden>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="code" id="offlineCode">
     <input type="hidden" name="override" id="offlineOverride">
     <input type="hidden" name="override_reason" id="offlineOverrideReason">
