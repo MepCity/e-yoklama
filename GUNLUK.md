@@ -1652,3 +1652,224 @@ Branch `main` ile merge edilmeye hazır. Gelecekte yapılabilecek geliştirmeler
 - `app.py`: API blueprint kaydındaki emoji'li `print` ifadeleri temizlendi
 - `api/verification_simple.py`: `create_standard_response()` imzasına eksik `details` parametresi eklendi
 
+---
+
+## 2026-05-06 — Doğrulama Akışı ve Mimari Sertleştirme
+
+**Tarih:** 2026-05-06  
+**İlgili commit'ler:** `a2baac9` (`Fix attendance verification flow`), `c5f8193` (`Harden verification architecture`)
+
+Bu bölüm, sonradan eklenen cihaz eşleme, konum doğrulama, QR okuma, admin düzenleme ve doğrulama API değişiklikleri sonrasında yapılan toparlama ve güvenlik/mimari iyileştirmelerini kayıt altına alır.
+
+### 1. Öğrenci Doğrulama Akışı Düzeltmeleri
+
+#### Tespit Edilen Sorunlar
+
+- Konum doğrulaması cihaz eşleşmesine bağlanmıştı ancak öğrenci doğrulama sayfasında JavaScript akışı bozuk olduğu için modal ve doğrulama adımları güvenilir şekilde çalışmıyordu.
+- Dashboard tarafında `/student/api/start-verification` çağrısı `GET` gibi kullanılıyordu; backend ise asıl olarak `POST` bekliyordu.
+- Öğrenci QR okuma akışı sadece `BarcodeDetector` destekleyen tarayıcılarda çalışıyordu; bazı tarayıcılarda kamera açılamıyor veya kullanıcı manuel girişe düşüyordu.
+
+#### Yapılan Düzeltmeler
+
+- `views/student.py`
+  - `/student/api/start-verification` endpoint'i `GET` ve `POST` uyumlu hale getirildi.
+  - Doğrulama başlatma, cihaz kontrolü ve manuel/şüpheli doğrulama akışları sadeleştirildi.
+
+- `templates/student/verifications.html`
+  - Bozuk eski doğrulama script'i devre dışı bırakıldı.
+  - Cihaz eşleme, konum doğrulama ve aktif yoklamaya kod gönderme için daha sade ve çalışır bir akış eklendi.
+
+- `templates/student/dashboard.html`
+  - `/student/api/start-verification` çağrısı `POST` JSON payload ile uyumlu hale getirildi.
+  - QR kamera okuma için `BarcodeDetector` yanında `jsQR` fallback'i eklendi.
+  - `BarcodeDetector` olmayan tarayıcılarda da kamera görüntüsünden QR okunabilmesi hedeflendi.
+
+### 2. Şüpheli Yoklama Karar Akışı
+
+#### Tespit Edilen Sorun
+
+Öğretmen ekranında şüpheli kayıt onay/ret mekanizması vardı; ancak kullanıcı dili "var/yok" kararına yeterince açık değildi ve test edilebilir şüpheli seed kaydı yoktu.
+
+#### Yapılan Düzeltmeler
+
+- `templates/teacher/active_session.html`
+  - Şüpheli yoklama karar butonları `Onayla / Reddet` yerine `Var Say / Yok Say` olarak güncellendi.
+
+- `views/teacher.py`
+  - Flash mesajları aynı dile çekildi: `var sayıldı`, `yok sayıldı`.
+
+- `seed.py`
+  - Öğretmen panelinde test edilebilecek aktif `DEMO01` yoklama oturumu ve 1 şüpheli kayıt eklendi.
+
+### 3. Admin Kalem/Modal Düzeltmeleri
+
+#### Tespit Edilen Sorun
+
+Admin panelinde öğrenci, öğretmen ve ders düzenleme kalem butonları inline `onclick` string parametreleriyle çalışıyordu. Kullanıcı adı, açıklama veya bölüm içinde tek tırnak gibi karakterler olduğunda JavaScript kırılabiliyordu.
+
+#### Yapılan Düzeltmeler
+
+- `templates/admin/students.html`
+- `templates/admin/teachers.html`
+- `templates/admin/courses.html`
+
+Bu template'lerde düzenleme modalına aktarılan veriler `tojson` ile güvenli hale getirildi. Böylece modal çağrıları string escape hatalarına karşı daha dayanıklı oldu.
+
+### 4. Runtime Hataları ve Verification API Toparlaması
+
+#### Tespit Edilen Sorunlar
+
+`api/verification_simple.py` içinde modelde olmayan alanlara erişiliyordu:
+
+- `verification.in_campus`
+- `verification.is_trusted_network`
+- `verification.network_name`
+
+Ayrıca bazı datetime alanları string tutulduğu halde `.isoformat()` çağrılıyordu. Bu durum `/api/v1/verifications/*` endpoint'lerinde runtime hatası üretebiliyordu.
+
+#### Yapılan Düzeltmeler
+
+- `api/verification_simple.py`
+  - Modelde olmayan alan erişimleri gerçek model alanlarıyla uyumlu hale getirildi.
+  - `_dt_iso()`, `_parse_dt()`, `_seconds_remaining()` yardımcıları eklendi.
+  - `LocationVerification.query` yerine scoped session ile uyumlu `db.query(LocationVerification)` kullanıldı.
+  - Endpoint'lere `@role_required(2)` koruması eklendi.
+  - Enlem/boylam validasyonu `not latitude` yerine `latitude is None` şeklinde düzeltildi; `0` koordinatı artık yanlışlıkla geçersiz sayılmaz.
+  - Client'a dönen ham `str(e)` detayları kaldırıldı; hatalar `logger.exception()` ile server tarafında loglanır.
+
+### 5. Güvenlik Sertleştirmeleri
+
+#### Eklenen Koruma ve Ayarlar
+
+- `utils/security.py`
+  - CSRF token üretimi `secrets.token_urlsafe(32)` ile yapılır.
+  - CSRF doğrulaması `secrets.compare_digest()` kullanır.
+  - Güvenlik header'ları merkezi helper ile response'a eklenir.
+
+- `app.py`
+  - Tüm `POST/PUT/PATCH/DELETE` istekleri için CSRF kontrolü eklendi.
+  - `after_request` ile security header'ları uygulanır.
+  - SocketIO CORS ayarı config'e bağlandı; env boşsa wildcard davranışına düşmemesi için default init kullanılır.
+  - Production ortamında `DEVICE_PAIRING_SECRET` dev default değerdeyse uygulama başlatılmaz.
+
+- `config.py`
+  - `SESSION_COOKIE_HTTPONLY = True`
+  - `SESSION_COOKIE_SAMESITE = 'Lax'`
+  - Production'da `SESSION_COOKIE_SECURE = True`
+  - `MAX_CONTENT_LENGTH = 4MB`
+  - `SOCKETIO_CORS_ALLOWED_ORIGINS` env'den okunur.
+
+- `templates/base.html`
+  - CSRF token meta tag'i eklendi.
+
+- `static/js/app.js`
+  - `fetch` istekleri için otomatik `X-CSRF-Token` header ekleyen merkezi patch eklendi.
+
+- POST form template'leri
+  - Tüm POST formlarına `<input type="hidden" name="csrf_token" ...>` eklendi.
+
+### 6. Service Katmanı Ayrıştırmaları
+
+#### Yeni Servis Dosyaları
+
+- `services/device_pairing_service.py`
+  - Cihaz ID hashleme/doğrulama HMAC-SHA256 ile burada yapılır.
+  - Cihaz eşleme ve expired pairing temizleme işlemleri view dışına alındı.
+
+- `services/location_verification_service.py`
+  - GPS, network ve manuel doğrulama oluşturma işlemleri view dışına alındı.
+  - Son doğrulama durum kontrolü ortaklaştırıldı.
+
+- `services/user_service.py`
+  - Öğrenci/öğretmen listeleme.
+  - Kullanıcı aktif/pasif toggle.
+  - Öğrenci cihaz eşleşmesi sıfırlama.
+
+- `services/course_service.py`
+  - Otomatik ders kodu üretimi view dışına alındı.
+
+- `services/constants.py`
+  - `PRESENT_STATUSES`
+  - `STATUS_TR`
+  - `FACULTY_DEPARTMENTS`
+  - `rate()`
+  - `faculty_for_department()`
+
+Bu düzenlemelerle `views/student.py` ve `views/admin.py` içindeki iş mantığı azaltıldı. Ancak view katmanında hâlâ doğrudan `db.query` kullanılan yerler vardır; bu konu kalan mimari borç olarak işaretlenmiştir.
+
+### 7. Kod Kalitesi ve Model Düzeltmeleri
+
+- `services/export_service.py`
+  - Kendi `PRESENT_STATUSES` ve `STATUS_TR` kopyaları kaldırıldı.
+  - `rate()` hesaplaması `services/constants.py` içindeki ortak helper'a bağlandı.
+
+- `services/statistics_service.py`
+  - Dead code olan `_status_counts()` kaldırıldı.
+  - Ortak `PRESENT_STATUSES` ve `rate()` helper'ı kullanılmaya başlandı.
+
+- `models/classroom.py`
+  - `Classroom.building_id` artık gerçek `ForeignKey('buildings.id')`.
+  - `building` relationship'i eklendi.
+
+- `models/device_pairing.py`
+  - `cleanup_expired()` içindeki `db_session.commit()` kaldırıldı; transaction yönetimi çağıran servis katmanına taşındı.
+
+- `wsgi.py`
+  - `FLASK_CONFIG` env değişkeninden config seçimi yapılır.
+  - `allow_unsafe_werkzeug` sadece debug modunda açılır.
+
+- `utils/rate_limit.py`
+  - Default limit constructor içinden kaldırıldı; config tarafındaki `RATELIMIT_DEFAULT` tek kaynak olarak bırakıldı.
+
+### 8. Sonradan Yakalanan Kritik Regresyon ve Düzeltme
+
+#### Sorun
+
+`views/admin.py` içindeki öğrenci aktif/pasif toggle akışı iki kez toggle yapıyordu:
+
+1. `user_service.toggle_user_active(...)` zaten toggle + commit yapıyordu.
+2. View içinde aynı öğrenci ikinci kez toggle ediliyordu.
+
+Sonuçta öğrenci durumu başlangıç değerine geri dönüyordu.
+
+#### Düzeltme
+
+- View içindeki ikinci toggle ve gereksiz `db.commit()` kaldırıldı.
+- Öğretmen toggle akışı zaten doğru olduğu için değiştirilmedi.
+
+### 9. Doğrulama ve Testler
+
+Çalıştırılan kontroller:
+
+```bash
+PYTHONPYCACHEPREFIX=/private/tmp/e-yoklama-pycache python3 -m py_compile ...
+python3 tests/integration_check.py
+```
+
+Sonuç:
+
+- Python compile başarılı.
+- Entegrasyon testi başarılı: `integration ok`
+- Admin sayfaları render kontrolü başarılı:
+  - `/admin/students`
+  - `/admin/teachers`
+  - `/admin/courses`
+  - `/admin/schedule`
+- Öğrenci sayfaları render kontrolü başarılı:
+  - `/student/dashboard`
+  - `/student/verifications`
+- `/api/v1/verifications/location`, `/network`, `/manual`, `/status`, `/history` test client ile doğrulandı.
+- Öğrenci aktif/pasif toggle için ayrı kontrol yapıldı; `1 -> 0` geçişi doğrulandı.
+
+### 10. Kalan Mimari Borçlar
+
+Bu fazda kritik runtime/güvenlik sorunları ve bazı katman ihlalleri giderildi; ancak proje tamamen profesyonel hedef mimariye taşınmış değildir.
+
+Kalan işler:
+
+- `views/admin.py`, `views/teacher.py`, `views/student.py` içinde hâlâ doğrudan DB sorguları vardır; sonraki fazlarda servis katmanına taşınmalı.
+- `templates/student/verifications.html` ve bazı admin template'lerinde hâlâ büyük inline JavaScript blokları vardır; `static/js/*` modüllerine ayrılmalı.
+- Alembic migration altyapısı yoktur; şema değişiklikleri `create_all` ile yönetiliyor.
+- Tarih alanları hâlâ büyük ölçüde string tutuluyor; gerçek timezone-aware `DateTime` kolonlarına geçiş planlanmalı.
+- SQLite geliştirme için yeterli olsa da production senaryosu için PostgreSQL ve migration stratejisi gereklidir.
+- Test altyapısı tek entegrasyon script'inden `pytest` tabanlı unit/integration/route testlerine genişletilmeli.
