@@ -32,6 +32,12 @@ def create_app(config_name='development'):
     from views.teacher import teacher_bp
     from views.student import student_bp
 
+    try:
+        from api.verification_simple import verification_bp
+        app.register_blueprint(verification_bp)
+    except ImportError:
+        pass
+
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(teacher_bp, url_prefix='/teacher')

@@ -1,4 +1,5 @@
 import hashlib
+import hmac
 from flask import Blueprint, render_template, session, redirect, url_for, request, flash, current_app, jsonify
 from utils.decorators import role_required
 from utils.rate_limit import limiter
@@ -176,10 +177,45 @@ def get_mac_address():
 
 def _derive_device_key(raw_device_id, user_agent):
     raw = (raw_device_id or '').strip()
-    if len(raw) < 16 or len(raw) > 128:
+    if not raw:
         return None
-    digest = hashlib.sha256(f'{raw}|{user_agent or ""}'.encode('utf-8')).hexdigest()
+    
+    # Kısa device ID'ler için de çalışacak şekilde güncellendi
+    # Minimum uzunluk kontrolünü kaldır, sadece maksimum uzunluk kontrolü yap
+    if len(raw) > 128:
+        return None
+    
+    # Gizli anahtar ile HMAC kullanarak güvenli device key oluştur
+    secret_key = current_app.config.get('DEVICE_PAIRING_SECRET', 'e-yoklama-device-pairing-dev')
+    hmac_obj = hmac.new(secret_key.encode('utf-8'), f'{raw}|{user_agent or ""}'.encode('utf-8'), hashlib.sha256)
+    digest = hmac_obj.hexdigest()
     return f'DV:{digest[:14]}'
+
+
+def _encrypt_device_id(raw_device_id, user_agent):
+    """Cihaz ID'sini gizli anahtar ile şifrele"""
+    raw = (raw_device_id or '').strip()
+    if not raw:
+        return None
+    
+    # Gizli anahtar ile HMAC kullanarak şifrele
+    secret_key = current_app.config.get('DEVICE_PAIRING_SECRET', 'e-yoklama-device-pairing-dev')
+    hmac_obj = hmac.new(secret_key.encode('utf-8'), f'{raw}|{user_agent or ""}'.encode('utf-8'), hashlib.sha256)
+    return hmac_obj.hexdigest()
+
+
+def _verify_device_id(raw_device_id, user_agent, stored_hash):
+    """Cihaz ID'sini saklı hash ile karşılaştır"""
+    current_hash = _encrypt_device_id(raw_device_id, user_agent)
+    if not current_hash or not stored_hash:
+        return False
+    
+    # Case-insensitive karşılaştırma yap - her iki hash'i de küçük harfe çevir
+    current_lower = current_hash.lower()
+    stored_lower = stored_hash.lower()
+    
+    # Sadece ilk 14 karakteri karşılaştır (veritabanında kısa saklıyor olabilir)
+    return hmac.compare_digest(current_lower[:14], stored_lower[:14])
 
 
 @student_bp.route('/api/pair-device', methods=['POST'])
@@ -191,14 +227,21 @@ def pair_device():
         user = db.query(User).filter_by(id=user_id).first()
         data = request.get_json(silent=True) or {}
         
+        print(f"DEBUG PAIR: User ID: {user_id}")
+        print(f"DEBUG PAIR: Device ID from client: {data.get('device_id')}")
+        print(f"DEBUG PAIR: User-Agent: {request.headers.get('User-Agent')}")
+        
         if not user or not user.student_number:
             return jsonify({'success': False, 'message': 'Öğrenci numarası bulunamadı'}), 400
         
-        device_key = _derive_device_key(data.get('device_id'), request.headers.get('User-Agent'))
-        if not device_key:
+        # Cihaz ID'sini gizli anahtar ile şifrele
+        encrypted_device_key = _encrypt_device_id(data.get('device_id'), request.headers.get('User-Agent'))
+        print(f"DEBUG PAIR: Encrypted device key: {encrypted_device_key}")
+        
+        if not encrypted_device_key:
             return jsonify({'success': False, 'message': 'Geçerli cihaz anahtarı alınamadı'}), 400
         
-        existing_mac_pairing = DevicePairing.get_by_mac_address(device_key, db)
+        existing_mac_pairing = DevicePairing.get_by_mac_address(encrypted_device_key, db)
         if existing_mac_pairing and existing_mac_pairing.user_id != user_id:
             other_user = db.query(User).filter_by(id=existing_mac_pairing.user_id).first()
             return jsonify({
@@ -215,14 +258,17 @@ def pair_device():
         if existing_pairing:
             existing_pairing.is_active = False
         
-        # Yeni eşleme oluştur
-        new_pairing = DevicePairing(user_id, device_key, user.student_number)
+        # Yeni eşleme oluştur (şifrelenmiş anahtar ile)
+        new_pairing = DevicePairing(user_id, encrypted_device_key, user.student_number)
         db.add(new_pairing)
         db.commit()
+        
+        print(f"DEBUG PAIR: New pairing created with encrypted MAC: {encrypted_device_key}")
         
         return jsonify({'success': True, 'message': 'Cihaz başarıyla eşlendi'})
         
     except Exception as e:
+        print(f"DEBUG PAIR: Exception: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
@@ -282,11 +328,16 @@ def verify_network():
         db.add(verification)
         db.commit()
         
+        # Ağ adını al
+        data = request.get_json() if request.method == 'POST' else {}
+        network_name = data.get('network_name', 'Unknown')
+        
         return jsonify({
             'success': True,
             'is_eduroam': trusted_network,
             'is_trusted_network': trusted_network,
             'is_suspicious': verification.is_suspicious,
+            'network_name': network_name,
             'network_info': remote_addr
         })
         
@@ -312,12 +363,16 @@ def manual_verification():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
-@student_bp.route('/api/start-verification')
+@student_bp.route('/api/start-verification', methods=['POST'])
 @role_required(2)
 def start_verification():
     """Doğrulama kodu başlat"""
     try:
         user_id = session['user']['id']
+        data = request.get_json(silent=True) or {}
+        with_location = data.get('with_location', True)
+        is_suspicious = data.get('is_suspicious', False)
+        
         if not _get_valid_device_pairing(user_id):
             return jsonify({'success': False, 'message': _device_pairing_required_message()}), 400
         
@@ -325,7 +380,29 @@ def start_verification():
         active_verification = LocationVerification.get_active_verification(user_id, db)
         
         if not active_verification or active_verification.is_expired:
-            return jsonify({'success': False, 'message': 'Önce konum doğrulaması yapın'}), 400
+            # Yeni konum doğrulaması oluştur
+            if with_location:
+                return jsonify({'success': False, 'message': 'Önce konum doğrulaması yapın'}), 400
+            else:
+                # Konumsuz doğrulama - şüpheli olarak işaretle
+                new_verification = LocationVerification(
+                    user_id=user_id,
+                    latitude=0.0,
+                    longitude=0.0,
+                    network_name='Unknown',
+                    is_suspicious=True,
+                    is_trusted_network=False,
+                    in_campus=False,
+                    created_at=datetime.now()
+                )
+                db.add(new_verification)
+                db.commit()
+                active_verification = new_verification
+        
+        # Şüpheli flag'ini güncelle
+        if is_suspicious:
+            active_verification.is_suspicious = True
+            db.commit()
         
         session['verification_user_id'] = user_id
         session['verification_expires'] = (datetime.now().timestamp() + 60)  # 60 saniye
@@ -334,10 +411,55 @@ def start_verification():
             'success': True,
             'is_suspicious': active_verification.is_suspicious,
             'expires_in': 60,
+            'message': 'Doğrulama başlatıldı'
         })
         
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@student_bp.route('/api/validate-device', methods=['POST'])
+@role_required(2)
+def validate_device():
+    """Cihaz eşleşmesini doğrula - farklı cihazdan giriş kontrolü"""
+    try:
+        user_id = session['user']['id']
+        data = request.get_json(silent=True) or {}
+        device_id = data.get('device_id')
+        
+        print(f"DEBUG: User ID: {user_id}")
+        print(f"DEBUG: Device ID from client: {device_id}")
+        print(f"DEBUG: User-Agent: {request.headers.get('User-Agent')}")
+        
+        if not device_id:
+            return jsonify({'valid': False, 'message': 'Cihaz bilgisi alınamadı'}), 400
+        
+        # Aktif eşlemeyi kontrol et
+        active_pairing = DevicePairing.get_active_pairing(user_id, db)
+        
+        if not active_pairing:
+            print("DEBUG: No active pairing found")
+            return jsonify({'valid': False, 'message': 'Bu hesap için aktif cihaz eşleşmesi bulunamadı'})
+        
+        print(f"DEBUG: Active pairing MAC: {active_pairing.mac_address}")
+        
+        # Mevcut cihazın şifrelenmiş anahtarını oluştur ve karşılaştır
+        current_device_hash = _encrypt_device_id(device_id, request.headers.get('User-Agent'))
+        print(f"DEBUG: Current device hash: {current_device_hash}")
+        print(f"DEBUG: Stored hash: {active_pairing.mac_address}")
+        
+        # Güvenli hash karşılaştırması yap
+        is_valid = _verify_device_id(device_id, request.headers.get('User-Agent'), active_pairing.mac_address)
+        print(f"DEBUG: Hash verification result: {is_valid}")
+        
+        if not is_valid:
+            return jsonify({'valid': False, 'message': 'Bu hesap size ait değil. Eşleşen cihaz farklı.'})
+        
+        return jsonify({'valid': True, 'message': 'Cihaz doğrulaması başarılı'})
+        
+    except Exception as e:
+        print(f"DEBUG: Exception in validate_device: {e}")
+        return jsonify({'valid': False, 'message': str(e)}), 500
 
 
 @student_bp.route('/api/check-device-pairing')
@@ -347,23 +469,73 @@ def check_device_pairing():
     try:
         user_id = session['user']['id']
         if not current_app.config.get('REQUIRE_DEVICE_PAIRING', True):
-            return jsonify({
-                'success': True,
-                'has_pairing': True,
-                'can_renew': False,
-                'days_until_renewal': 0,
-                'required': False,
-            })
-
-        device_pairing = DevicePairing.get_active_pairing(user_id, db)
+            return jsonify({'success': True, 'required': False, 'has_pairing': False})
         
+        pairing = _get_valid_device_pairing(user_id)
         return jsonify({
             'success': True,
-            'has_pairing': device_pairing is not None,
-            'can_renew': device_pairing.can_renew if device_pairing else False,
-            'days_until_renewal': device_pairing.days_until_renewal if device_pairing else 0,
             'required': True,
+            'has_pairing': pairing is not None
         })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@student_bp.route('/api/check-location-verification')
+@role_required(2)
+def check_location_verification():
+    """Konum doğrulama durumunu kontrol et"""
+    try:
+        print(f"DEBUG: check-location-verification API çağrıldı")
+        user_id = session['user']['id']
+        print(f"DEBUG: User ID: {user_id}")
+        
+        # Son konum doğrulamasını kontrol et
+        print(f"DEBUG: get_latest_verification çağrılıyor...")
+        verification = LocationVerification.get_latest_verification(user_id, db)
+        print(f"DEBUG: Verification sonucu: {verification}")
+        
+        if not verification:
+            print(f"DEBUG: Hiç doğrulama bulunamadı")
+            return jsonify({
+                'success': True,
+                'verified': False,
+                'message': 'Henüz konum doğrulaması yapılmadı'
+            })
+        
+        # Doğrulamanın geçerliliğini kontrol et (1 saat içinde geçerli)
+        from datetime import datetime, timedelta
+        print(f"DEBUG: Verification verified_at: {verification.verified_at}")
+        
+        # verified_at string ise datetime'a çevir
+        if isinstance(verification.verified_at, str):
+            try:
+                created_dt = datetime.strptime(verification.verified_at, '%Y-%m-%d %H:%M:%S')
+            except:
+                created_dt = datetime.now()
+        else:
+            created_dt = verification.verified_at
+            
+        if created_dt < datetime.now() - timedelta(hours=1):
+            print(f"DEBUG: Doğrulama süresi dolmuş")
+            return jsonify({
+                'success': True,
+                'verified': False,
+                'message': 'Konum doğrulamasının süresi dolmuş'
+            })
+        
+        print(f"DEBUG: Doğrulama geçerli")
+        return jsonify({
+            'success': True,
+            'verified': True,
+            'message': 'Konum doğrulaması geçerli'
+        })
+        
+    except Exception as e:
+        print(f"DEBUG: check-location-verification hatası: {e}")
+        import traceback
+        print(f"DEBUG: Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'message': str(e)}), 500
         
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500

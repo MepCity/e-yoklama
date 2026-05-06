@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, session, redirect, url_for, request, flash, send_file
+from flask import Blueprint, render_template, session, redirect, url_for, request, flash, send_file, jsonify
 from utils.decorators import role_required
 from database import db
 from models.user import User
@@ -6,6 +6,7 @@ from models.course import Course, CourseStudent
 from models.schedule import Schedule
 from models.popular_course import PopularCourse
 from models.classroom import Building, Classroom
+from models.device_pairing import DevicePairing
 from services import auth_service, statistics_service, export_service
 
 admin_bp = Blueprint('admin', __name__)
@@ -104,6 +105,96 @@ def toggle_student(student_id):
     return redirect(url_for('admin.students'))
 
 
+@admin_bp.route('/edit_student/<int:student_id>', methods=['POST'])
+@role_required(0)
+def edit_student(student_id):
+    """Öğrenci bilgilerini güncelle"""
+    try:
+        student = db.query(User).filter_by(id=student_id, role=2).first()
+        if not student:
+            return jsonify({'success': False, 'message': 'Öğrenci bulunamadı'}), 404
+        
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip()
+        student_number = request.form.get('student_number', '').strip()
+        department = request.form.get('department', '').strip()
+        class_name = request.form.get('class_name', '').strip()
+        
+        # Validasyonlar
+        if not username or not email or not student_number:
+            return jsonify({'success': False, 'message': 'Kullanıcı adı, e-posta ve öğrenci numarası zorunludur'}), 400
+        
+        # Kullanıcı adı benzersizliği kontrolü (kendisi hariç)
+        existing_user = db.query(User).filter(
+            User.username == username,
+            User.id != student_id
+        ).first()
+        if existing_user:
+            return jsonify({'success': False, 'message': 'Bu kullanıcı adı zaten kullanılıyor'}), 400
+        
+        # E-posta benzersizliği kontrolü (kendisi hariç)
+        existing_email = db.query(User).filter(
+            User.email == email,
+            User.id != student_id
+        ).first()
+        if existing_email:
+            return jsonify({'success': False, 'message': 'Bu e-posta adresi zaten kullanılıyor'}), 400
+        
+        # Öğrenci numarası benzersizliği kontrolü (kendisi hariç)
+        existing_student_number = db.query(User).filter(
+            User.student_number == student_number,
+            User.id != student_id
+        ).first()
+        if existing_student_number:
+            return jsonify({'success': False, 'message': 'Bu öğrenci numarası zaten kullanılıyor'}), 400
+        
+        # Öğrenci bilgilerini güncelle
+        student.username = username
+        student.email = email
+        student.student_number = student_number
+        student.department = department if department else None
+        student.class_name = class_name if class_name else None
+        
+        db.commit()
+        
+        return jsonify({'success': True, 'message': 'Öğrenci bilgileri başarıyla güncellendi'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@admin_bp.route('/reset-student-device-pairing/<int:student_id>', methods=['POST'])
+@role_required(0)
+def reset_student_device_pairing(student_id):
+    """Öğrencinin cihaz eşleşmesini sıfırla"""
+    try:
+        # Öğrenciyi kontrol et
+        student = db.query(User).filter_by(id=student_id, role=2).first()
+        if not student:
+            return jsonify({'success': False, 'message': 'Öğrenci bulunamadı'}), 404
+        
+        # Öğrencinin cihaz eşleşmelerini bul ve sil
+        pairings = db.query(DevicePairing).filter_by(user_id=student_id).all()
+        
+        if not pairings:
+            return jsonify({'success': False, 'message': 'Bu öğrencinin cihaz eşleşmesi bulunmamaktadır'}), 404
+        
+        # Tüm eşleşmeleri sil
+        for pairing in pairings:
+            db.delete(pairing)
+        
+        db.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'{student.username} kullanıcısının {len(pairings)} adet cihaz eşleşmesi başarıyla sıfırlandı'
+        })
+        
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 @admin_bp.route('/add_teacher', methods=['POST'])
 @role_required(0)
 def add_teacher():
@@ -140,14 +231,57 @@ def toggle_teacher(teacher_id):
     return redirect(url_for('admin.teachers'))
 
 
+@admin_bp.route('/edit_teacher/<int:teacher_id>', methods=['POST'])
+@role_required(0)
+def edit_teacher(teacher_id):
+    try:
+        teacher = db.query(User).filter(User.id == teacher_id, User.role == 1).first()
+        if not teacher:
+            return {'success': False, 'message': 'Öğretmen bulunamadı.'}
+        
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip()
+        branch = request.form.get('branch', '').strip()
+        
+        if not username or not email:
+            return {'success': False, 'message': 'Tüm zorunlu alanlar doldurulmalıdır.'}
+        
+        # Kullanıcı adı ve e-posta benzersizlik kontrolü
+        existing_user = db.query(User).filter(
+            User.username == username,
+            User.id != teacher_id
+        ).first()
+        if existing_user:
+            return {'success': False, 'message': 'Bu kullanıcı adı zaten kullanılıyor.'}
+        
+        existing_email = db.query(User).filter(
+            User.email == email,
+            User.id != teacher_id
+        ).first()
+        if existing_email:
+            return {'success': False, 'message': 'Bu e-posta adresi zaten kullanılıyor.'}
+        
+        # Güncelleme
+        teacher.username = username
+        teacher.email = email
+        teacher.branch = branch or None
+        
+        db.commit()
+        
+        return {'success': True, 'message': 'Öğretmen bilgileri güncellendi.'}
+        
+    except Exception as e:
+        return {'success': False, 'message': f'Bir hata oluştu: {str(e)}'}
+
+
 @admin_bp.route('/courses')
 @role_required(0)
 def courses():
     try:
         show_inactive = request.args.get('show_inactive', 'false') == 'true'
         
-        # Kurs sorgusu - bina ve sınıf bilgileriyle birlikte
-        course_query = db.query(Course).outerjoin(Building, Course.building_id == Building.id).outerjoin(Classroom, Course.classroom_id == Classroom.id)
+        # Kurs sorgusu
+        course_query = db.query(Course)
         if not show_inactive:
             course_query = course_query.filter(Course.is_active == 1)
         course_list = course_query.all()
@@ -156,60 +290,161 @@ def courses():
         teacher_list = db.query(User).filter(User.role == 1, User.is_active == 1).all()
         # Sadece aktif öğrenciler
         student_list = db.query(User).filter(User.role == 2, User.is_active == 1).all()
-        # Popüler dersler
-        popular_courses = db.query(PopularCourse).filter(PopularCourse.is_active == 1).all()
-        # Binalar
-        buildings = db.query(Building).filter(Building.is_active == True).all()
-        # Sınıflar
-        classrooms = db.query(Classroom).filter(Classroom.is_active == True).all()
+        
+        # Bölümleri al
+        departments = db.query(User.department).filter(
+            User.role == 1, User.department.isnot(None)
+        ).distinct().all()
+        departments = [d[0] for d in departments if d[0]]
+        
+        # Fakülte-bölüm eşleştirmesi
+        faculty_departments = {
+            'Mühendislik Fakültesi': [
+                'Bilgisayar Mühendisliği',
+                'Yazılım Mühendisliği', 
+                'Elektrik-Elektronik Mühendisliği',
+                'Makine Mühendisliği',
+                'İnşaat Mühendisliği',
+                'Endüstri Mühendisliği',
+                'Kimya Mühendisliği',
+                'Çevre Mühendisliği',
+                'Gıda Mühendisliği'
+            ],
+            'Tıp Fakültesi': [
+                'Tıp',
+                'Diş Hekimliği',
+                'Eczacılık'
+            ],
+            'Sağlık Bilimleri Fakültesi': [
+                'Hemşirelik',
+                'Fizyoterapi ve Rehabilitasyon'
+            ],
+            'Eğitim Fakültesi': [
+                'Psikolojik Danışmanlık ve Rehberlik'
+            ],
+            'Fen Edebiyat Fakültesi': [
+                'Psikoloji',
+                'Moleküler Biyoloji ve Genetik'
+            ],
+            'Hukuk Fakültesi': [
+                'Hukuk'
+            ],
+            'İktisadi ve İdari Bilimler Fakültesi': [
+                'İşletme',
+                'İktisat',
+                'Uluslararası Ticaret ve Finans'
+            ]
+        }
+        
+        # Mevcut dersleri al (kurs şablonları olarak)
+        existing_courses = db.query(Course).filter(
+            Course.is_active == 1
+        ).all()
         
         return render_template('admin/courses.html', 
                          courses=course_list, 
                          teachers=teacher_list, 
                          students=student_list, 
-                         popular_courses=popular_courses, 
-                         buildings=buildings,
-                         classrooms=classrooms,
+                         departments=departments,
+                         faculty_departments=faculty_departments,
+                         existing_courses=existing_courses,
                          show_inactive=show_inactive)
     except Exception as e:
         flash(f'Dersler sayfasında hata: {str(e)}', 'error')
         return redirect(url_for('admin.dashboard'))
 
 
+def generate_course_code(department, name):
+    """Otomatik ders kodu üretir"""
+    if not department or not name:
+        return None
+    
+    # Departman kod harfleri
+    dept_codes = {
+        'Bilgisayar Mühendisliği': 'BM',
+        'Yazılım Mühendisliği': 'YM',
+        'Elektrik-Elektronik Mühendisliği': 'EE',
+        'Makine Mühendisliği': 'MM',
+        'İnşaat Mühendisliği': 'İM',
+        'Endüstri Mühendisliği': 'EM',
+        'Kimya Mühendisliği': 'KM',
+        'Çevre Mühendisliği': 'ÇM',
+        'Gıda Mühendisliği': 'GM',
+        'Tıp': 'TP',
+        'Diş Hekimliği': 'DH',
+        'Eczacılık': 'EC',
+        'Hemşirelik': 'HS',
+        'Fizyoterapi ve Rehabilitasyon': 'FR',
+        'Psikoloji': 'PS',
+        'Hukuk': 'HK',
+        'İşletme': 'İS',
+        'İktisat': 'IK',
+        'Uluslararası Ticaret ve Finans': 'UF',
+        'Psikolojik Danışmanlık ve Rehberlik': 'PD',
+        'Moleküler Biyoloji ve Genetik': 'BG'
+    }
+    
+    dept_code = dept_codes.get(department, 'GN')  # Genel olarak 'GN'
+    
+    # Ders adından kelime al
+    words = name.split()
+    if len(words) >= 2:
+        # İki kelimeden ilk harflerini al
+        course_code_part = ''.join([word[0].upper() for word in words[:2]])
+    else:
+        # Tek kelime ise ilk üç harfi
+        course_code_part = words[0][:3].upper() if len(words[0]) >= 3 else words[0].upper()
+    
+    # Mevcut ders kodlarını kontrol et
+    base_code = f"{dept_code}{course_code_part}"
+    existing_codes = db.query(Course.code).filter(
+        Course.code.like(f"{base_code}%")
+    ).all()
+    existing_codes = [code[0] for code in existing_codes if code[0]]
+    
+    if not existing_codes:
+        return base_code
+    
+    # Eğer aynı kod varsa sonuna sayı ekle
+    counter = 1
+    while f"{base_code}{counter:02d}" in existing_codes:
+        counter += 1
+    
+    return f"{base_code}{counter:02d}"
+
+
 @admin_bp.route('/create_course', methods=['POST'])
 @role_required(0)
 def create_course():
     try:
-        # Popüler ders seçimi
-        popular_course_id = request.form.get('popular_course_id', type=int)
-        # Özel ders bilgileri
+        # Ders bilgileri
         name = request.form.get('name', '').strip()
         code = request.form.get('code', '').strip()
         description = request.form.get('description', '').strip()
         teacher_id = request.form.get('teacher_id', type=int)
         department = request.form.get('department', '').strip()
         class_name = request.form.get('class_name', '').strip()
-        building_id = request.form.get('building_id', type=int)
-        classroom_id = request.form.get('classroom_id', type=int)
+        building_code = request.form.get('building_code', '').strip()
+        classroom_code = request.form.get('classroom_code', '').strip()
         day_of_week = request.form.get('day_of_week', type=int)
         start_time = request.form.get('start_time', '').strip()
         end_time = request.form.get('end_time', '').strip()
 
-        if popular_course_id:
-            # Popüler ders seçildiyse bilgileri database'den al
-            popular_course = db.query(PopularCourse).filter(PopularCourse.id == popular_course_id).first()
-            if not popular_course:
-                flash('Popüler ders bulunamadı.', 'error')
-                return redirect(url_for('admin.courses'))
-            
-            name = popular_course.course_name
-            code = popular_course.course_code
-            description = popular_course.description
-            department = popular_course.department
-
         if not name or not teacher_id:
             flash('Ders adı ve öğretmen seçimi zorunludur.', 'error')
             return redirect(url_for('admin.courses'))
+        
+        # Ders kodu belirtilmemişse otomatik oluştur
+        if not code:
+            code = generate_course_code(department, name)
+            if code:
+                flash(f'Otomatik ders kodu oluşturuldu: {code}', 'info')
+        else:
+            # Manuel kod girilmişse benzersizlik kontrolü
+            existing_code = db.query(Course).filter(Course.code == code).first()
+            if existing_code:
+                flash(f'Bu ders kodu ({code}) zaten kullanılıyor. Başka bir kod deneyin veya boş bırakarak otomatik oluşturun.', 'error')
+                return redirect(url_for('admin.courses'))
 
         # Ders çakışma kontrolleri
         if day_of_week and start_time and end_time:
@@ -217,8 +452,7 @@ def create_course():
             conflict = db.query(Course).filter(
                 Course.teacher_id == teacher_id,
                 Course.day_of_week == day_of_week,
-                Course.status == 1,  # Sadece aktif dersler kontrol edilir
-                Course.id != request.form.get('course_id', 0)  # Edit durumunda kendini kontrol etme
+                Course.is_active == 1  # Sadece aktif dersler kontrol edilir
             ).filter(
                 # Zaman çakışması kontrolü
                 (Course.start_time <= start_time) & (Course.end_time > start_time) |
@@ -230,13 +464,13 @@ def create_course():
                 flash(f'Öğretmenin aynı gün ve saatte başka dersi var: {conflict.name} ({conflict.start_time}-{conflict.end_time})', 'error')
                 return redirect(url_for('admin.courses'))
 
-            # 2. Aynı sınıfta aynı gün ve saatte başka ders var mı?
-            if classroom_id:
+            # 2. Aynı derslikte aynı gün ve saatte başka ders var mı?
+            if building_code and classroom_code:
                 classroom_conflict = db.query(Course).filter(
-                    Course.classroom_id == classroom_id,
+                    Course.building_code == building_code,
+                    Course.classroom_code == classroom_code,
                     Course.day_of_week == day_of_week,
-                    Course.status == 1,
-                    Course.id != request.form.get('course_id', 0)
+                    Course.is_active == 1
                 ).filter(
                     (Course.start_time <= start_time) & (Course.end_time > start_time) |
                     (Course.start_time < end_time) & (Course.end_time >= end_time) |
@@ -244,7 +478,7 @@ def create_course():
                 ).first()
                 
                 if classroom_conflict:
-                    flash(f'Sınıfın aynı gün ve saatte başka ders var: {classroom_conflict.name} ({classroom_conflict.start_time}-{classroom_conflict.end_time})', 'error')
+                    flash(f'Dersliğin aynı gün ve saatte başka ders var: {classroom_conflict.name} ({classroom_conflict.start_time}-{classroom_conflict.end_time})', 'error')
                     return redirect(url_for('admin.courses'))
 
             # 3. Aynı sınıfta aynı gün ve saatte başka ders var mı? (class_name kontrolü)
@@ -252,8 +486,7 @@ def create_course():
                 class_conflict = db.query(Course).filter(
                     Course.class_name == class_name,
                     Course.day_of_week == day_of_week,
-                    Course.status == 1,
-                    Course.id != request.form.get('course_id', 0)
+                    Course.is_active == 1
                 ).filter(
                     (Course.start_time <= start_time) & (Course.end_time > start_time) |
                     (Course.start_time < end_time) & (Course.end_time >= end_time) |
@@ -264,13 +497,40 @@ def create_course():
                     flash(f'Sınıfın aynı gün ve saatte başka ders var: {class_conflict.name} ({class_conflict.start_time}-{class_conflict.end_time})', 'error')
                     return redirect(url_for('admin.courses'))
 
-        # Öğretmenin bölümü ile ders bölümünü kontrol et (öğretmen branşı yoksa izin ver)
+        # Öğretmenin fakültesi ile ders fakültesini kontrol et
         teacher = db.query(User).filter(User.id == teacher_id).first()
-        if teacher and teacher.branch and department and teacher.branch != department:
-            flash(f'Öğretmenin bölümü ({teacher.branch}) ile dersin bölümü ({department}) uyuşmuyor.', 'error')
-            return redirect(url_for('admin.courses'))
+        if teacher and teacher.branch and department:
+            # Fakülte-bölüm eşleştirmesi
+            faculty_departments = {
+                'Mühendislik Fakültesi': [
+                    'Bilgisayar Mühendisliği', 'Yazılım Mühendisliği', 'Elektrik-Elektronik Mühendisliği',
+                    'Makine Mühendisliği', 'İnşaat Mühendisliği', 'Endüstri Mühendisliği',
+                    'Kimya Mühendisliği', 'Çevre Mühendisliği', 'Gıda Mühendisliği'
+                ],
+                'Tıp Fakültesi': ['Tıp', 'Diş Hekimliği', 'Eczacılık'],
+                'Sağlık Bilimleri Fakültesi': ['Hemşirelik', 'Fizyoterapi ve Rehabilitasyon'],
+                'Eğitim Fakültesi': ['Psikolojik Danışmanlık ve Rehberlik'],
+                'Fen Edebiyat Fakültesi': ['Psikoloji', 'Moleküler Biyoloji ve Genetik'],
+                'Hukuk Fakültesi': ['Hukuk'],
+                'İktisadi ve İdari Bilimler Fakültesi': ['İşletme', 'İktisat', 'Uluslararası Ticaret ve Finans']
+            }
+            
+            # Öğretmenin ve dersin fakültelerini bul
+            teacher_faculty = None
+            course_faculty = None
+            
+            for faculty, departments in faculty_departments.items():
+                if teacher.branch in departments:
+                    teacher_faculty = faculty
+                if department in departments:
+                    course_faculty = faculty
+            
+            # Farklı fakültelerde ise izin verme
+            if teacher_faculty and course_faculty and teacher_faculty != course_faculty:
+                flash(f'Öğretmenin fakültesi ({teacher_faculty}) ile dersin fakültesi ({course_faculty}) uyuşmuyor. Öğretmen sadece kendi fakültesindeki dersleri verebilir.', 'error')
+                return redirect(url_for('admin.courses'))
 
-        # Yeni ders oluştur - öğretmen onayı bekliyor olarak
+        # Yeni ders oluştur
         course = Course(
             name=name,
             code=code or None,
@@ -278,38 +538,175 @@ def create_course():
             teacher_id=teacher_id,
             department=department or None,
             class_name=class_name or None,
-            building_id=building_id,
-            classroom_id=classroom_id,
+            building_code=building_code or None,
+            classroom_code=classroom_code or None,
             day_of_week=day_of_week,
             start_time=start_time,
             end_time=end_time,
-            teacher_approval=0,  # Öğretmen onayı bekliyor
-            status=0  # Onay bekliyor
+            is_active=1  # Aktif olarak oluştur
         )
         db.add(course)
         db.commit()
         flash('Ders oluşturuldu. Öğretmen onayı bekleniyor.', 'success')
         return redirect(url_for('admin.courses'))
     except Exception as e:
-        flash(f'Ders oluşturulurken hata: {str(e)}', 'error')
-        return redirect(url_for('admin.courses'))
+        return {'success': False, 'message': f'Bir hata oluştu: {str(e)}'}
+
+
+@admin_bp.route('/edit_course/<int:course_id>', methods=['POST'])
+@role_required(0)
+def edit_course(course_id):
+    try:
+        course = db.query(Course).filter(Course.id == course_id).first()
+        if not course:
+            return {'success': False, 'message': 'Ders bulunamadı.'}
+        
+        name = request.form.get('name', '').strip()
+        code = request.form.get('code', '').strip()
+        description = request.form.get('description', '').strip()
+        teacher_id = request.form.get('teacher_id', type=int)
+        department = request.form.get('department', '').strip()
+        class_name = request.form.get('class_name', '').strip()
+        building_code = request.form.get('building_code', '').strip()
+        classroom_code = request.form.get('classroom_code', '').strip()
+        day_of_week = request.form.get('day_of_week', type=int)
+        start_time = request.form.get('start_time', '').strip()
+        end_time = request.form.get('end_time', '').strip()
+
+        if not name or not teacher_id:
+            return {'success': False, 'message': 'Ders adı ve öğretmen seçimi zorunludur.'}
+        
+        # Ders kodu belirtilmemişse otomatik oluştur
+        if not code:
+            code = generate_course_code(department, name)
+        else:
+            # Manuel kod girilmişse benzersizlik kontrolü (kendisi hariç)
+            existing_code = db.query(Course).filter(Course.code == code, Course.id != course_id).first()
+            if existing_code:
+                return {'success': False, 'message': f'Bu ders kodu ({code}) zaten kullanılıyor.'}
+
+        # Ders çakışma kontrolleri
+        if day_of_week and start_time and end_time:
+            # 1. Aynı öğretmenin aynı gün ve saatte başka dersi var mı? (kendisi hariç)
+            conflict = db.query(Course).filter(
+                Course.teacher_id == teacher_id,
+                Course.day_of_week == day_of_week,
+                Course.is_active == 1,
+                Course.id != course_id
+            ).filter(
+                # Zaman çakışması kontrolü
+                (Course.start_time <= start_time) & (Course.end_time > start_time) |
+                (Course.start_time < end_time) & (Course.end_time >= end_time) |
+                (Course.start_time >= start_time) & (Course.end_time <= end_time)
+            ).first()
+            
+            if conflict:
+                return {'success': False, 'message': f'Öğretmenin aynı gün ve saatte başka dersi var: {conflict.name} ({conflict.start_time}-{conflict.end_time})'}
+
+            # 2. Aynı derslikte aynı gün ve saatte başka ders var mı? (kendisi hariç)
+            if building_code and classroom_code:
+                classroom_conflict = db.query(Course).filter(
+                    Course.building_code == building_code,
+                    Course.classroom_code == classroom_code,
+                    Course.day_of_week == day_of_week,
+                    Course.is_active == 1,
+                    Course.id != course_id
+                ).filter(
+                    (Course.start_time <= start_time) & (Course.end_time > start_time) |
+                    (Course.start_time < end_time) & (Course.end_time >= end_time) |
+                    (Course.start_time >= start_time) & (Course.end_time <= end_time)
+                ).first()
+                
+                if classroom_conflict:
+                    return {'success': False, 'message': f'Dersliğin aynı gün ve saatte başka ders var: {classroom_conflict.name} ({classroom_conflict.start_time}-{classroom_conflict.end_time})'}
+
+            # 3. Aynı sınıfta aynı gün ve saatte başka ders var mı? (kendisi hariç)
+            if class_name:
+                class_conflict = db.query(Course).filter(
+                    Course.class_name == class_name,
+                    Course.day_of_week == day_of_week,
+                    Course.is_active == 1,
+                    Course.id != course_id
+                ).filter(
+                    (Course.start_time <= start_time) & (Course.end_time > start_time) |
+                    (Course.start_time < end_time) & (Course.end_time >= end_time) |
+                    (Course.start_time >= start_time) & (Course.end_time <= end_time)
+                ).first()
+                
+                if class_conflict:
+                    return {'success': False, 'message': f'Sınıfın aynı gün ve saatte başka ders var: {class_conflict.name} ({class_conflict.start_time}-{class_conflict.end_time})'}
+
+        # Öğretmenin fakültesi ile ders fakültesini kontrol et
+        teacher = db.query(User).filter(User.id == teacher_id).first()
+        if teacher and teacher.branch and department:
+            # Fakülte-bölüm eşleştirmesi
+            faculty_departments = {
+                'Mühendislik Fakültesi': [
+                    'Bilgisayar Mühendisliği', 'Yazılım Mühendisliği', 'Elektrik-Elektronik Mühendisliği',
+                    'Makine Mühendisliği', 'İnşaat Mühendisliği', 'Endüstri Mühendisliği',
+                    'Kimya Mühendisliği', 'Çevre Mühendisliği', 'Gıda Mühendisliği'
+                ],
+                'Tıp Fakültesi': ['Tıp', 'Diş Hekimliği', 'Eczacılık'],
+                'Sağlık Bilimleri Fakültesi': ['Hemşirelik', 'Fizyoterapi ve Rehabilitasyon'],
+                'Eğitim Fakültesi': ['Psikolojik Danışmanlık ve Rehberlik'],
+                'Fen Edebiyat Fakültesi': ['Psikoloji', 'Moleküler Biyoloji ve Genetik'],
+                'Hukuk Fakültesi': ['Hukuk'],
+                'İktisadi ve İdari Bilimler Fakültesi': ['İşletme', 'İktisat', 'Uluslararası Ticaret ve Finans']
+            }
+            
+            # Öğretmenin ve dersin fakültelerini bul
+            teacher_faculty = None
+            course_faculty = None
+            
+            for faculty, departments in faculty_departments.items():
+                if teacher.branch in departments:
+                    teacher_faculty = faculty
+                if department in departments:
+                    course_faculty = faculty
+            
+            # Farklı fakültelerde ise izin verme
+            if teacher_faculty and course_faculty and teacher_faculty != course_faculty:
+                return {'success': False, 'message': f'Öğretmenin fakültesi ({teacher_faculty}) ile dersin fakültesi ({course_faculty}) uyuşmuyor. Öğretmen sadece kendi fakültesindeki dersleri verebilir.'}
+
+        # Güncelleme
+        course.name = name
+        course.code = code or None
+        course.description = description or None
+        course.teacher_id = teacher_id
+        course.department = department or None
+        course.class_name = class_name or None
+        course.building_code = building_code or None
+        course.classroom_code = classroom_code or None
+        course.day_of_week = day_of_week
+        course.start_time = start_time
+        course.end_time = end_time
+        
+        db.commit()
+        
+        return {'success': True, 'message': 'Ders bilgileri güncellendi.'}
+        
+    except Exception as e:
+        return {'success': False, 'message': f'Bir hata oluştu: {str(e)}'}
 
 
 @admin_bp.route('/toggle_course/<int:course_id>', methods=['POST'])
 @role_required(0)
 def toggle_course(course_id):
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        flash('Ders bulunamadı.', 'error')
+    try:
+        course = db.query(Course).filter(Course.id == course_id).first()
+        if not course:
+            flash('Ders bulunamadı.', 'error')
+            return redirect(url_for('admin.courses'))
+        
+        course.is_active = 0 if course.is_active == 1 else 1
+        db.commit()
+        
+        status = "pasif" if course.is_active == 0 else "aktif"
+        flash(f'Ders {status} durumuna getirildi.', 'success')
         return redirect(url_for('admin.courses'))
-    
-    course.is_active = 0 if course.is_active == 1 else 1
-    db.commit()
-    
-    status = "pasif" if course.is_active == 0 else "aktif"
-    flash(f'Ders {status} durumuna getirildi.', 'success')
-    return redirect(url_for('admin.courses'))
-
+    except Exception as e:
+        flash(f'Ders durumu değiştirilirken hata: {str(e)}', 'error')
+        return redirect(url_for('admin.courses'))
 
 @admin_bp.route('/student_approvals')
 @role_required(0)

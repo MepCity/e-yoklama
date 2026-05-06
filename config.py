@@ -38,6 +38,9 @@ class Config:
     # Cihaz eşleşmesi zorunluluğu
     REQUIRE_DEVICE_PAIRING = os.environ.get('REQUIRE_DEVICE_PAIRING', 'true').lower() == 'true'
 
+    # Cihaz eşleşmesi imzalama anahtarı
+    DEVICE_PAIRING_SECRET = os.environ.get('DEVICE_PAIRING_SECRET', 'e-yoklama-device-pairing-dev')
+
 
 class DevelopmentConfig(Config):
     DEBUG = True

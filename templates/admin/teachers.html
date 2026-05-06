@@ -56,6 +56,9 @@
                     {% endif %}
                 </td>
                 <td>
+                    <button class="btn btn-small btn-primary" onclick="openEditTeacherModal({{ t.id }}, '{{ t.username }}', '{{ t.email }}', '{{ t.branch or '' }}')" title="Düzenle">
+                        ✏️
+                    </button>
                     <form method="POST" action="{{ url_for('admin.toggle_teacher', teacher_id=t.id) }}" style="display: inline;">
                         <button type="submit" class="btn btn-small {{ 'btn-danger' if t.is_active == 1 else 'btn-success' }}" 
                                 onclick="return confirm('Öğretmeni {% if t.is_active == 1 %}pasife{% else %}aktife{% endif %} almak istediğinize emin misiniz?')">
@@ -105,5 +108,118 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleInactiveTeachers();
     }
 });
+
+function openEditTeacherModal(teacherId, username, email, branch) {
+    // Modal oluştur
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'block';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <span class="close" onclick="closeEditTeacherModal()">&times;</span>
+            <h3>Öğretmen Düzenle</h3>
+            <form id="edit-teacher-form">
+                <input type="hidden" id="edit-teacher-id" value="${teacherId}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Kullanıcı Adı *</label>
+                        <input type="text" id="edit-username" value="${username}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>E-posta *</label>
+                        <input type="email" id="edit-email" value="${email}" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Branş</label>
+                        <input type="text" id="edit-branch" value="${branch}" placeholder="Branş girin...">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-primary" onclick="saveTeacher()">Kaydet</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeEditTeacherModal()">İptal</button>
+                </div>
+            </form>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+function closeEditTeacherModal() {
+    const modal = document.querySelector('.modal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function saveTeacher() {
+    const teacherId = document.getElementById('edit-teacher-id').value;
+    const username = document.getElementById('edit-username').value;
+    const email = document.getElementById('edit-email').value;
+    const branch = document.getElementById('edit-branch').value;
+    
+    fetch('/admin/edit_teacher/' + teacherId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+            'username': username,
+            'email': email,
+            'branch': branch
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeEditTeacherModal();
+            location.reload();
+        } else {
+            alert('Hata: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Bir hata oluştu.');
+    });
+}
 </script>
+
+<style>
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 600px;
+    border-radius: 5px;
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+}
+</style>
 {% endblock %}

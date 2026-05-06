@@ -8,74 +8,50 @@
     <form method="POST" action="{{ url_for('admin.create_course') }}">
         <div class="form-row">
             <div class="form-group">
-                <label>Ders Seçimi *</label>
-                <select name="popular_course_id" id="popular-course-select" required onchange="updateCourseFromPopular()">
-                    <option value="">Popüler Ders Seçin</option>
-                    {% for course in popular_courses %}
-                    <option value="{{ course.id }}" data-department="{{ course.department }}" data-code="{{ course.course_code or '' }}" data-description="{{ course.description or '' }}">
-                        {{ course.course_name }} ({{ course.course_code or 'Kodsuz' }}) - {{ course.department }}
+                <label>Mevcut Ders Seçimi</label>
+                <select name="existing_course_id" id="existing-course-select" onchange="populateFromExistingCourse()">
+                    <option value="">Mevcut Ders Seçin (İsteğe Bağlı)</option>
+                    {% for course in existing_courses %}
+                    <option value="{{ course.id }}" 
+                            data-name="{{ course.name }}" 
+                            data-code="{{ course.code or '' }}" 
+                            data-description="{{ course.description or '' }}" 
+                            data-department="{{ course.department or '' }}"
+                            data-class-name="{{ course.class_name or '' }}">
+                        {{ course.name }} ({{ course.code or 'Kodsuz' }}) - {{ course.department or '-' }}
                     </option>
                     {% endfor %}
-                    <option value="custom">Özel Ders Oluştur</option>
+                    <option value="new">Yeni Ders Oluştur</option>
                 </select>
             </div>
         </div>
         
-        <div id="custom-course-fields" style="display: none;">
-            <div class="form-group">
-                <label>Ders Adı *</label>
-                <input type="text" name="name" id="course-name" required placeholder="Ders adını girin...">
+        <div id="new-course-fields">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Ders Adı *</label>
+                    <input type="text" name="name" id="course-name" required placeholder="Ders adını girin...">
+                </div>
+                <div class="form-group">
+                    <label>Ders Kodu</label>
+                    <input type="text" name="code" id="course-code" placeholder="Ders kodunu girin...">
+                </div>
             </div>
-            <div class="form-group">
-                <label>Ders Kodu</label>
-                <input type="text" name="code" id="course-code" placeholder="Ders kodunu girin...">
-            </div>
-            <div class="form-group">
-                <label>Bölüm</label>
-                <select name="department" id="department-select">
-                    <option value="">Bölüm Seçiniz</option>
-                    <option value="Bilgisayar Mühendisliği">Bilgisayar Mühendisliği</option>
-                    <option value="Yazılım Mühendisliği">Yazılım Mühendisliği</option>
-                    <option value="Elektrik-Elektronik Mühendisliği">Elektrik-Elektronik Mühendisliği</option>
-                    <option value="Makine Mühendisliği">Makine Mühendisliği</option>
-                    <option value="İnşaat Mühendisliği">İnşaat Mühendisliği</option>
-                    <option value="Endüstri Mühendisliği">Endüstri Mühendisliği</option>
-                    <option value="Kimya Mühendisliği">Kimya Mühendisliği</option>
-                    <option value="Çevre Mühendisliği">Çevre Mühendisliği</option>
-                    <option value="Gıda Mühendisliği">Gıda Mühendisliği</option>
-                    <option value="Tıp">Tıp</option>
-                    <option value="Diş Hekimliği">Diş Hekimliği</option>
-                    <option value="Eczacılık">Eczacılık</option>
-                    <option value="Hemşirelik">Hemşirelik</option>
-                    <option value="Fizyoterapi ve Rehabilitasyon">Fizyoterapi ve Rehabilitasyon</option>
-                    <option value="Psikoloji">Psikoloji</option>
-                    <option value="Hukuk">Hukuk</option>
-                    <option value="İşletme">İşletme</option>
-                    <option value="İktisat">İktisat</option>
-                    <option value="Uluslararası Ticaret ve Finans">Uluslararası Ticaret ve Finans</option>
-                    <option value="Psikolojik Danışmanlık ve Rehberlik">Psikolojik Danışmanlık ve Rehberlik</option>
-                    <option value="Moleküler Biyoloji ve Genetik">Moleküler Biyoloji ve Genetik</option>
-                </select>
-            </div>
+        </div>
+        <div class="form-row">
             <div class="form-group">
                 <label>Açıklama</label>
                 <input type="text" name="description" placeholder="Ders açıklaması">
             </div>
         </div>
-        
-        <div id="hidden-fields" style="display: none;">
-            <input type="hidden" name="name" id="hidden-name">
-            <input type="hidden" name="code" id="hidden-code">
-            <input type="hidden" name="department" id="hidden-department">
-            <input type="text" name="description" id="hidden-description" style="display: none;">
-        </div>
+        <input type="hidden" name="department" id="hidden-department">
         <div class="form-row">
             <div class="form-group">
                 <label>Öğretmen *</label>
-                <select name="teacher_id" required>
+                <select name="teacher_id" id="teacher-select" required>
                     <option value="">Seçiniz</option>
                     {% for t in teachers %}
-                    <option value="{{ t.id }}">{{ t.username }} ({{ t.branch or '-' }})</option>
+                    <option value="{{ t.id }}" data-branch="{{ t.branch or '' }}">{{ t.username }} ({{ t.branch or '-' }})</option>
                     {% endfor %}
                 </select>
             </div>
@@ -83,17 +59,17 @@
         
         <div class="form-row">
             <div class="form-group">
-                <label>Derslik Binası</label>
-                <select name="building_id" id="building-select" onchange="updateClassrooms()">
+                <label>Bina</label>
+                <select name="building_code" id="building-select" onchange="updateClassrooms()">
                     <option value="">Bina Seçiniz</option>
-                    {% for building in buildings %}
-                    <option value="{{ building.id }}">{{ building.building_code }} - {{ building.building_name }}</option>
+                    {% for building in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] %}
+                    <option value="{{ building }}">Bina {{ building }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="form-group">
-                <label>Derslik (Fiziksel Sınıf)</label>
-                <select name="classroom_id" id="classroom-select">
+                <label>Derslik</label>
+                <select name="classroom_code" id="classroom-select">
                     <option value="">Önce Bina Seçiniz</option>
                 </select>
             </div>
@@ -115,11 +91,21 @@
             </div>
             <div class="form-group">
                 <label>Başlangıç Saati</label>
-                <input type="time" name="start_time" min="08:00" max="22:00">
+                <select name="start_time">
+                    <option value="">Seçiniz</option>
+                    {% for hour in range(8, 23) %}
+                    <option value="{{ '%02d:00' % hour }}">{{ '%02d:00' % hour }}</option>
+                    {% endfor %}
+                </select>
             </div>
             <div class="form-group">
                 <label>Bitiş Saati</label>
-                <input type="time" name="end_time" min="08:00" max="22:00">
+                <select name="end_time">
+                    <option value="">Seçiniz</option>
+                    {% for hour in range(9, 24) %}
+                    <option value="{{ '%02d:00' % hour }}">{{ '%02d:00' % hour }}</option>
+                    {% endfor %}
+                </select>
             </div>
         </div>
         
@@ -195,13 +181,8 @@
                 <td>{{ c.department or '-' }}</td>
                 <td>{{ c.class_name or '-' }}</td>
                 <td>
-                    {% if c.building_id and c.classroom_id %}
-                        {% set classroom = c.classrooms.filter_by(id=c.classroom_id).first() %}
-                        {% if classroom %}
-                            {{ classroom.classroom_code }} ({{ classroom.building.building_code if classroom.building else '-' }})
-                        {% else %}
-                            {{ c.classroom_id or '-' }}
-                        {% endif %}
+                    {% if c.building_code and c.classroom_code %}
+                        {{ c.classroom_code }} ({{ c.building_code }})
                     {% else %}
                         {{ '-' }}
                     {% endif %}
@@ -222,6 +203,9 @@
                     {% endif %}
                 </td>
                 <td>
+                    <button class="btn btn-small btn-primary" onclick="openEditCourseModal({{ c.id }}, '{{ c.name }}', '{{ c.code or '' }}', '{{ c.description or '' }}', {{ c.teacher_id or 'null' }}, '{{ c.department or '' }}', '{{ c.class_name or '' }}', '{{ c.building_code or '' }}', '{{ c.classroom_code or '' }}', {{ c.day_of_week or 'null' }}, '{{ c.start_time or '' }}', '{{ c.end_time or '' }}')" title="Düzenle">
+                        ✏️
+                    </button>
                     <form method="POST" action="{{ url_for('admin.toggle_course', course_id=c.id) }}" style="display: inline;">
                         <button type="submit" class="btn btn-small {{ 'btn-danger' if c.is_active == 1 else 'btn-success' }}" 
                                 onclick="return confirm('Dersi {% if c.is_active == 1 %}pasife{% else %}aktife{% endif %} almak istediğinize emin misiniz?')">
@@ -268,47 +252,12 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('show-inactive-courses').checked = showInactive;
     toggleInactiveCourses();
 });
-</script>
 
-<script>
-function updateCourseFromPopular() {
-    const select = document.getElementById('popular-course-select');
-    const customFields = document.getElementById('custom-course-fields');
-    const hiddenFields = document.getElementById('hidden-fields');
-    const selectedOption = select.options[select.selectedIndex];
+function filterTeachersByDepartment() {
+    const teacherSelect = document.getElementById('teacher-select');
+    const hiddenDepartment = document.getElementById('hidden-department');
+    const selectedDepartment = hiddenDepartment.value;
     
-    if (select.value === 'custom') {
-        // Özel ders oluştur
-        customFields.style.display = 'block';
-        hiddenFields.style.display = 'none';
-        
-        // Gizli alanları temizle
-        document.getElementById('hidden-name').value = '';
-        document.getElementById('hidden-code').value = '';
-        document.getElementById('hidden-department').value = '';
-        document.getElementById('hidden-description').value = '';
-    } else if (select.value) {
-        // Popüler ders seçildi
-        customFields.style.display = 'none';
-        hiddenFields.style.display = 'block';
-        
-        // Gizli alanları doldur
-        document.getElementById('hidden-name').value = selectedOption.textContent.split(' (')[0];
-        document.getElementById('hidden-code').value = selectedOption.getAttribute('data-code') || '';
-        document.getElementById('hidden-department').value = selectedOption.getAttribute('data-department') || '';
-        document.getElementById('hidden-description').value = selectedOption.getAttribute('data-description') || '';
-        
-        // Öğretmen listesini bölüme göre filtrele
-        filterTeachersByDepartment(selectedOption.getAttribute('data-department'));
-    } else {
-        // Seçim yapılmadı
-        customFields.style.display = 'none';
-        hiddenFields.style.display = 'none';
-    }
-}
-
-function filterTeachersByDepartment(department) {
-    const teacherSelect = document.querySelector('select[name="teacher_id"]');
     const teachers = [
         {% for t in teachers %}
         { id: {{ t.id }}, username: "{{ t.username }}", branch: "{{ t.branch or '' }}" },
@@ -324,9 +273,107 @@ function filterTeachersByDepartment(department) {
     // Öğretmenleri ekle
     teachers.forEach(teacher => {
         // Eğer bölüm belirtilmişse, sadece o bölümdeki öğretmenleri göster
-        if (!department || !teacher.branch || teacher.branch === department) {
+        if (!selectedDepartment || !teacher.branch || teacher.branch === selectedDepartment) {
             const option = document.createElement('option');
             option.value = teacher.id;
+            option.setAttribute('data-branch', teacher.branch);
+            option.textContent = `${teacher.username} (${teacher.branch || '-'})`;
+            teacherSelect.appendChild(option);
+        }
+    });
+    
+    // Önceki seçimi geri yükle (hala mevcutsa)
+    if (currentSelection) {
+        teacherSelect.value = currentSelection;
+    }
+}
+
+function filterTeachersByFaculty() {
+    const teacherSelect = document.getElementById('teacher-select');
+    const hiddenDepartment = document.getElementById('hidden-department');
+    const selectedDepartment = hiddenDepartment.value;
+    
+    const teachers = [
+        {% for t in teachers %}
+        { id: {{ t.id }}, username: "{{ t.username }}", branch: "{{ t.branch or '' }}" },
+        {% endfor %}
+    ];
+    
+    // Fakülte-bölüm eşleştirmesi
+    const facultyDepartments = {
+        'Mühendislik Fakültesi': [
+            'Bilgisayar Mühendisliği',
+            'Yazılım Mühendisliği', 
+            'Elektrik-Elektronik Mühendisliği',
+            'Makine Mühendisliği',
+            'İnşaat Mühendisliği',
+            'Endüstri Mühendisliği',
+            'Kimya Mühendisliği',
+            'Çevre Mühendisliği',
+            'Gıda Mühendisliği'
+        ],
+        'Tıp Fakültesi': [
+            'Tıp',
+            'Diş Hekimliği',
+            'Eczacılık'
+        ],
+        'Sağlık Bilimleri Fakültesi': [
+            'Hemşirelik',
+            'Fizyoterapi ve Rehabilitasyon'
+        ],
+        'Eğitim Fakültesi': [
+            'Psikolojik Danışmanlık ve Rehberlik'
+        ],
+        'Fen Edebiyat Fakültesi': [
+            'Psikoloji',
+            'Moleküler Biyoloji ve Genetik'
+        ],
+        'Hukuk Fakültesi': [
+            'Hukuk'
+        ],
+        'İktisadi ve İdari Bilimler Fakültesi': [
+            'İşletme',
+            'İktisat',
+            'Uluslararası Ticaret ve Finans'
+        ]
+    };
+    
+    // Seçilen dersin fakültesini bul
+    let selectedFaculty = null;
+    for (const [faculty, departments] of Object.entries(facultyDepartments)) {
+        if (departments.includes(selectedDepartment)) {
+            selectedFaculty = faculty;
+            break;
+        }
+    }
+    
+    // Mevcut seçimi sakla
+    const currentSelection = teacherSelect.value;
+    
+    // Listeyi temizle
+    teacherSelect.innerHTML = '<option value="">Seçiniz</option>';
+    
+    // Öğretmenleri fakülte bazında filtrele
+    teachers.forEach(teacher => {
+        let showTeacher = false;
+        
+        if (!selectedFaculty || !teacher.branch) {
+            // Fakülte seçilmediyse veya öğretmenin bölümü yoksa tümünü göster
+            showTeacher = true;
+        } else {
+            // Öğretmenin bölümünün seçilen fakültte olup olmadığını kontrol et
+            for (const [faculty, departments] of Object.entries(facultyDepartments)) {
+                if (faculty === selectedFaculty && departments.includes(teacher.branch)) {
+                    showTeacher = true;
+                    break;
+                }
+            }
+        }
+        
+        if (showTeacher) {
+            const option = document.createElement('option');
+            option.value = teacher.id;
+            option.setAttribute('data-branch', teacher.branch);
             option.textContent = `${teacher.username} (${teacher.branch || '-'})`;
             teacherSelect.appendChild(option);
         }
@@ -341,34 +388,442 @@ function filterTeachersByDepartment(department) {
 function updateClassrooms() {
     const buildingSelect = document.getElementById('building-select');
     const classroomSelect = document.getElementById('classroom-select');
-    const selectedBuildingId = buildingSelect.value;
+    const selectedBuilding = buildingSelect.value;
     
-    if (!selectedBuildingId) {
+    if (!selectedBuilding) {
         classroomSelect.innerHTML = '<option value="">Önce Bina Seçiniz</option>';
         return;
     }
     
-    // Binalara göre sınıfları filtrele
-    const classrooms = [
-        {% for classroom in classrooms %}
-        { id: {{ classroom.id }}, building_id: {{ classroom.building_id }}, code: "{{ classroom.classroom_code }}", name: "{{ classroom.classroom_code }} - {{ classroom.classroom_name }}" },
+    classroomSelect.innerHTML = '<option value="">Sınıf Seçiniz</option>';
+    
+    // 01-19 arası derslikleri oluştur
+    for (let i = 1; i <= 19; i++) {
+        const roomNumber = i.toString().padStart(2, '0');
+        const option = document.createElement('option');
+        option.value = roomNumber;
+        option.textContent = `${selectedBuilding}${roomNumber}`;
+        classroomSelect.appendChild(option);
+    }
+}
+
+function openEditCourseModal(courseId, name, code, description, teacherId, department, className, buildingCode, classroomCode, dayOfWeek, startTime, endTime) {
+    // Modal oluştur
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'block';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <span class="close" onclick="closeEditCourseModal()">&times;</span>
+            <h3>Ders Düzenle</h3>
+            <div class="department-info">
+                <strong>Bölüm:</strong> ${department || 'Belirtilmemiş'}
+            </div>
+            <form id="edit-course-form">
+                <input type="hidden" id="edit-course-id" value="${courseId}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Ders Adı *</label>
+                        <input type="text" id="edit-name" value="${name}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Ders Kodu</label>
+                        <input type="text" id="edit-code" value="${code}" placeholder="Boş bırakırsanız otomatik oluşturulur">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Açıklama</label>
+                        <input type="text" id="edit-description" value="${description}" placeholder="Ders açıklaması">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Öğretmen *</label>
+                        <select id="edit-teacher-select" required>
+                            <option value="">Seçiniz</option>
+                            {% for t in teachers %}
+                            <option value="{{ t.id }}" data-branch="{{ t.branch or '' }}" ${teacherId === {{ t.id }} ? 'selected' : ''}>{{ t.username }} ({{ t.branch or '-' }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Bina</label>
+                        <select id="edit-building-select" onchange="updateClassroomsEdit()">
+                            <option value="">Bina Seçiniz</option>
+                            {% for building in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] %}
+                            <option value="{{ building }}" ${buildingCode === '{{ building }}' ? 'selected' : ''}>Bina {{ building }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Derslik</label>
+                        <select id="edit-classroom-select">
+                            <option value="">Önce Bina Seçiniz</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Gün</label>
+                        <select id="edit-day-select">
+                            <option value="">Gün Seçiniz</option>
+                            <option value="1" ${dayOfWeek === 1 ? 'selected' : ''}>Pazartesi</option>
+                            <option value="2" ${dayOfWeek === 2 ? 'selected' : ''}>Salı</option>
+                            <option value="3" ${dayOfWeek === 3 ? 'selected' : ''}>Çarşamba</option>
+                            <option value="4" ${dayOfWeek === 4 ? 'selected' : ''}>Perşembe</option>
+                            <option value="5" ${dayOfWeek === 5 ? 'selected' : ''}>Cuma</option>
+                            <option value="6" ${dayOfWeek === 6 ? 'selected' : ''}>Cumartesi</option>
+                            <option value="7" ${dayOfWeek === 7 ? 'selected' : ''}>Pazar</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Başlangıç Saati</label>
+                        <select id="edit-start-select">
+                            <option value="">Seçiniz</option>
+                            {% for hour in range(8, 23) %}
+                            <option value="{{ '%02d:00' % hour }}" ${startTime === '{{ '%02d:00' % hour }}' ? 'selected' : ''}>{{ '%02d:00' % hour }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Bitiş Saati</label>
+                        <select id="edit-end-select">
+                            <option value="">Seçiniz</option>
+                            {% for hour in range(9, 24) %}
+                            <option value="{{ '%02d:00' % hour }}" ${endTime === '{{ '%02d:00' % hour }}' ? 'selected' : ''}>{{ '%02d:00' % hour }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Sınıf (Grup)</label>
+                        <select id="edit-class-name-select">
+                            <option value="">Seçiniz</option>
+                            <option value="Hazırlık" ${className === 'Hazırlık' ? 'selected' : ''}>Hazırlık</option>
+                            <option value="1. Sınıf" ${className === '1. Sınıf' ? 'selected' : ''}>1. Sınıf</option>
+                            <option value="2. Sınıf" ${className === '2. Sınıf' ? 'selected' : ''}>2. Sınıf</option>
+                            <option value="3. Sınıf" ${className === '3. Sınıf' ? 'selected' : ''}>3. Sınıf</option>
+                            <option value="4. Sınıf" ${className === '4. Sınıf' ? 'selected' : ''}>4. Sınıf</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-primary" onclick="saveCourse()">Kaydet</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeEditCourseModal()">İptal</button>
+                </div>
+            </form>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Bina ve derslik seçimlerini ayarla
+    if (buildingCode) {
+        document.getElementById('edit-building-select').value = buildingCode;
+        updateClassroomsEdit();
+        if (classroomCode) {
+            setTimeout(() => {
+                document.getElementById('edit-classroom-select').value = classroomCode;
+            }, 100);
+        }
+    }
+}
+
+function closeEditCourseModal() {
+    const modal = document.querySelector('.modal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function filterTeachersByDepartmentEdit() {
+    const departmentSelect = document.getElementById('edit-department-select');
+    const teacherSelect = document.getElementById('edit-teacher-select');
+    const selectedDepartment = departmentSelect.value;
+    
+    const teachers = [
+        {% for t in teachers %}
+        { id: {{ t.id }}, username: "{{ t.username }}", branch: "{{ t.branch or '' }}" },
         {% endfor %}
     ];
     
-    const filteredClassrooms = classrooms.filter(room => room.building_id == selectedBuildingId);
+    // Mevcut seçimi sakla
+    const currentSelection = teacherSelect.value;
+    
+    // Listeyi temizle
+    teacherSelect.innerHTML = '<option value="">Seçiniz</option>';
+    
+    // Öğretmenleri ekle
+    teachers.forEach(teacher => {
+        // Eğer bölüm belirtilmişse, sadece o bölümdeki öğretmenleri göster
+        if (!selectedDepartment || !teacher.branch || teacher.branch === selectedDepartment) {
+            const option = document.createElement('option');
+            option.value = teacher.id;
+            option.setAttribute('data-branch', teacher.branch);
+            option.textContent = `${teacher.username} (${teacher.branch || '-'})`;
+            teacherSelect.appendChild(option);
+        }
+    });
+    
+    // Önceki seçimi geri yükle (hala mevcutsa)
+    if (currentSelection) {
+        teacherSelect.value = currentSelection;
+    }
+}
+
+function updateClassroomsEdit() {
+    const buildingSelect = document.getElementById('edit-building-select');
+    const classroomSelect = document.getElementById('edit-classroom-select');
+    const selectedBuilding = buildingSelect.value;
+    
+    if (!selectedBuilding) {
+        classroomSelect.innerHTML = '<option value="">Önce Bina Seçiniz</option>';
+        return;
+    }
     
     classroomSelect.innerHTML = '<option value="">Sınıf Seçiniz</option>';
-    filteredClassrooms.forEach(room => {
+    
+    // 01-19 arası derslikleri oluştur
+    for (let i = 1; i <= 19; i++) {
+        const roomNumber = i.toString().padStart(2, '0');
         const option = document.createElement('option');
-        option.value = room.id;
-        option.textContent = room.name;
+        option.value = roomNumber;
+        option.textContent = `${selectedBuilding}${roomNumber}`;
         classroomSelect.appendChild(option);
+    }
+}
+
+function saveCourse() {
+    const courseId = document.getElementById('edit-course-id').value;
+    const name = document.getElementById('edit-name').value;
+    const code = document.getElementById('edit-code').value;
+    const description = document.getElementById('edit-description').value;
+    const teacherId = document.getElementById('edit-teacher-select').value;
+    const className = document.getElementById('edit-class-name-select').value;
+    const buildingCode = document.getElementById('edit-building-select').value;
+    const classroomCode = document.getElementById('edit-classroom-select').value;
+    const dayOfWeek = document.getElementById('edit-day-select').value;
+    const startTime = document.getElementById('edit-start-select').value;
+    const endTime = document.getElementById('edit-end-select').value;
+    
+    // Bölüm bilgisini modal'dan al (department-info div'inden)
+    const departmentInfo = document.querySelector('.department-info');
+    const departmentText = departmentInfo ? departmentInfo.textContent.replace('Bölüm:', '').trim() : '';
+    
+    fetch('/admin/edit_course/' + courseId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+            'name': name,
+            'code': code,
+            'description': description,
+            'teacher_id': teacherId,
+            'department': departmentText,
+            'class_name': className,
+            'building_code': buildingCode,
+            'classroom_code': classroomCode,
+            'day_of_week': dayOfWeek,
+            'start_time': startTime,
+            'end_time': endTime
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeEditCourseModal();
+            location.reload();
+        } else {
+            alert('Hata: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Bir hata oluştu.');
     });
 }
 
-// Sayfa yüklendiğinde form durumunu ayarla
-document.addEventListener('DOMContentLoaded', function() {
-    updateCourseFromPopular();
-});
+function populateFromExistingCourse() {
+    const select = document.getElementById('existing-course-select');
+    const selectedOption = select.options[select.selectedIndex];
+    const newCourseFields = document.getElementById('new-course-fields');
+    
+    if (select.value === 'new') {
+        // Yeni ders oluştur - alanları temizle ve etkinleştir
+        newCourseFields.style.display = 'block';
+        document.getElementById('course-name').value = '';
+        document.getElementById('course-code').value = '';
+        document.getElementById('hidden-department').value = '';
+        document.querySelector('input[name="description"]').value = '';
+        document.querySelector('select[name="class_name"]').value = '';
+        
+        // Öğretmen listesini güncelle (bölüm olmadan tüm öğretmenler)
+        filterTeachersByDepartment();
+    } else if (select.value) {
+        // Mevcut ders seçildi - alanları doldur
+        newCourseFields.style.display = 'block';
+        document.getElementById('course-name').value = selectedOption.getAttribute('data-name') || '';
+        document.getElementById('course-code').value = selectedOption.getAttribute('data-code') || '';
+        document.getElementById('hidden-department').value = selectedOption.getAttribute('data-department') || '';
+        document.querySelector('input[name="description"]').value = selectedOption.getAttribute('data-description') || '';
+        document.querySelector('select[name="class_name"]').value = selectedOption.getAttribute('data-class-name') || '';
+        
+        // Öğretmen listesini fakülte bazında filtrele
+        filterTeachersByFaculty();
+    } else {
+        // Seçim yapılmadı - alanları gizle
+        newCourseFields.style.display = 'none';
+    }
+}
+
+function showFacultyDepartments() {
+    // Fakülte-bölüm verileri
+    const facultyDepartments = {
+        'Mühendislik Fakültesi': [
+            'Bilgisayar Mühendisliği',
+            'Yazılım Mühendisliği', 
+            'Elektrik-Elektronik Mühendisliği',
+            'Makine Mühendisliği',
+            'İnşaat Mühendisliği',
+            'Endüstri Mühendisliği',
+            'Kimya Mühendisliği',
+            'Çevre Mühendisliği',
+            'Gıda Mühendisliği'
+        ],
+        'Tıp Fakültesi': [
+            'Tıp',
+            'Diş Hekimliği',
+            'Eczacılık'
+        ],
+        'Sağlık Bilimleri Fakültesi': [
+            'Hemşirelik',
+            'Fizyoterapi ve Rehabilitasyon'
+        ],
+        'Eğitim Fakültesi': [
+            'Psikolojik Danışmanlık ve Rehberlik'
+        ],
+        'Fen Edebiyat Fakültesi': [
+            'Psikoloji',
+            'Moleküler Biyoloji ve Genetik'
+        ],
+        'Hukuk Fakültesi': [
+            'Hukuk'
+        ],
+        'İktisadi ve İdari Bilimler Fakültesi': [
+            'İşletme',
+            'İktisat',
+            'Uluslararası Ticaret ve Finans'
+        ]
+    };
+    
+    // Modal oluştur
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'block';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 800px;">
+            <span class="close" onclick="closeFacultyModal()">&times;</span>
+            <h3>Fakülte Bölümleri</h3>
+            <div class="faculty-grid">
+                ${Object.entries(facultyDepartments).map(([faculty, departments]) => `
+                    <div class="faculty-section">
+                        <h4>${faculty}</h4>
+                        <div class="department-list">
+                            ${departments.map(dept => `
+                                <div class="department-item" onclick="selectDepartment('${dept}')">
+                                    ${dept}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeFacultyModal()">Kapat</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+function closeFacultyModal() {
+    const modal = document.querySelector('.modal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function selectDepartment(department) {
+    document.getElementById('department-select').value = department;
+    filterTeachersByDepartment();
+    closeFacultyModal();
+}
 </script>
+
+<style>
+.faculty-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.faculty-section {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 15px;
+    background-color: #f9f9f9;
+}
+
+.faculty-section h4 {
+    margin: 0 0 10px 0;
+    color: #333;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 5px;
+}
+
+.department-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.department-item {
+    padding: 8px 12px;
+    background-color: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 14px;
+}
+
+.department-item:hover {
+    background-color: #007bff;
+    color: white;
+    border-color: #0056b3;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.department-item:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.department-info {
+    background-color: #e7f3ff;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    border-left: 4px solid #007bff;
+    font-size: 14px;
+}
+</style>
 {% endblock %}

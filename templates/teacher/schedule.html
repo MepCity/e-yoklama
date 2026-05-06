@@ -46,44 +46,19 @@
 {% endif %}
 
 <h2>Ders Programı</h2>
-{% if schedule_data %}
-<div class="schedule-container">
-    <div class="schedule-table-wrapper">
-        <table class="schedule-table">
-            <thead>
-                <tr>
-                    <th class="time-column">Saat</th>
-                    <th>Pazartesi</th>
-                    <th>Salı</th>
-                    <th>Çarşamba</th>
-                    <th>Perşembe</th>
-                    <th>Cuma</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for time_slot, row_data in schedule_data.items() %}
-                <tr>
-                    <td class="time-slot">{{ time_slot }}</td>
-                    {% for day, course_codes in row_data.items() %}
-                    {% if course_codes %}
-                    <td class="course-cell" style="background-color: #3498db;">
-                        <div class="course-info">
-                            {% set codes = course_codes.split(', ') %}
-                            {% for code in codes %}
-                            <strong>{{ code }}</strong>
-                            {% if not loop.last %}<br>{% endif %}
-                            {% endfor %}
-                        </div>
-                    </td>
-                    {% else %}
-                    <td class="empty-cell"></td>
-                    {% endif %}
-                    {% endfor %}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+{% if schedules %}
+<div class="schedule-list">
+    {% for schedule in schedules %}
+    <div class="schedule-time-item">
+        <div class="time-info">
+            <span class="day-name">{{ day_name(schedule.day_of_week) }}</span>
+            <span class="time-range">{{ schedule.start_time }} - {{ schedule.end_time }}</span>
+        </div>
+        <div class="room-info">
+            📍 {{ schedule.room or 'Belirtilmemiş' }}
+        </div>
     </div>
+    {% endfor %}
 </div>
 {% else %}
 <p>Henüz ders saati eklenmemiş.</p>
@@ -136,98 +111,66 @@
     flex-wrap: wrap;
 }
 
-.schedule-container {
+.schedule-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
     margin: 20px 0;
-    overflow-x: auto;
 }
 
-.schedule-table-wrapper {
+.schedule-time-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
     background: white;
+    border: 1px solid #e0e0e0;
     border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: box-shadow 0.3s ease;
+    border-left: 4px solid #3498db;
 }
 
-.schedule-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
+.schedule-time-item:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 
-.schedule-table th {
-    background: #f8f9fa;
-    padding: 10px 5px;
-    text-align: center;
+.time-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.day-name {
     font-weight: 600;
     color: #2c3e50;
-    border: 1px solid #dee2e6;
-    white-space: nowrap;
+    font-size: 1em;
 }
 
-.schedule-table td {
-    padding: 8px 5px;
-    text-align: center;
-    border: 1px solid #dee2e6;
-    vertical-align: top;
-    min-width: 80px;
-    height: 40px;
+.time-range {
+    color: #7f8c8d;
+    font-size: 0.9em;
 }
 
-.time-column {
-    background: #e9ecef !important;
-    font-weight: 600;
-    min-width: 60px;
-}
-
-.time-slot {
-    font-size: 11px;
-    color: #495057;
-}
-
-.empty-cell {
-    background: #fafafa;
-}
-
-.course-cell {
-    position: relative;
-}
-
-.course-info {
-    font-size: 10px;
-    line-height: 1.2;
-    color: white;
-    text-align: left;
-    padding: 2px;
-}
-
-.course-info strong {
-    display: block;
-    font-size: 10px;
-    margin-bottom: 1px;
-}
-
-.course-info small {
-    display: block;
-    opacity: 0.9;
+.room-info {
+    color: #3498db;
+    font-size: 0.9em;
+    font-weight: 500;
 }
 
 @media (max-width: 768px) {
-    .schedule-table {
-        font-size: 10px;
+    .schedule-time-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
     }
     
-    .schedule-table th,
-    .schedule-table td {
-        padding: 5px 2px;
-        min-width: 60px;
+    .time-info {
+        width: 100%;
     }
     
-    .course-info {
-        font-size: 8px;
-    }
-    
-    .course-info strong {
-        font-size: 9px;
+    .room-info {
+        align-self: flex-end;
     }
 }
 </style>

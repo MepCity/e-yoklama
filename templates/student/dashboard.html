@@ -202,6 +202,90 @@
 
 {% block scripts %}
 <script>
+// Cihaz ID'si alma fonksiyonu (verifications.html'den kopyalandı)
+async function getOrCreateDeviceId() {
+    const key = 'e_yoklama_device_id';
+    let deviceId = localStorage.getItem(key);
+    
+    if (!deviceId) {
+        // Önce MAC adresi almaya çalış
+        const macAddress = await getMacAddress();
+        
+        if (macAddress) {
+            deviceId = macAddress;
+            console.log('MAC address found for device ID:', deviceId);
+        } else {
+            // MAC adresi alınamazsa UUID kullan (fallback)
+            if (window.crypto && crypto.randomUUID) {
+                deviceId = crypto.randomUUID();
+            } else {
+                deviceId = String(Date.now()) + '-' + Math.random().toString(16).slice(2);
+            }
+            console.log('MAC address not found, using UUID:', deviceId);
+        }
+        
+        localStorage.setItem(key, deviceId);
+        console.log('New device ID created:', deviceId);
+    }
+    
+    return deviceId;
+}
+
+// MAC adresi alma fonksiyonu (verifications.html'den kopyalandı)
+async function getMacAddress() {
+    try {
+        // Önce localStorage'da mevcut MAC adresi var mı kontrol et
+        const storedMac = localStorage.getItem('e_yoklama_mac_address');
+        if (storedMac) {
+            console.log('Stored MAC address found:', storedMac);
+            return storedMac;
+        }
+        
+        // WebRTC kullanarak MAC adresi tahmini
+        const pc = new RTCPeerConnection({ iceServers: [] });
+        
+        return new Promise((resolve) => {
+            pc.createDataChannel('');
+            pc.createOffer()
+                .then(offer => pc.setLocalDescription(offer))
+                .then(() => {
+                    const lines = pc.localDescription.sdp.split('\n');
+                    console.log('SDP lines:', lines);
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('a=candidate:')) {
+                            const parts = line.split(' ');
+                            console.log('Candidate parts:', parts);
+                            if (parts.length > 4) {
+                                const candidate = parts[5];
+                                console.log('Candidate:', candidate);
+                                // MAC adresi formatını kontrol et
+                                if (candidate && candidate.match(/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/)) {
+                                    // MAC adresini localStorage'a kaydet
+                                    localStorage.setItem('e_yoklama_mac_address', candidate);
+                                    console.log('MAC address found and stored:', candidate);
+                                    pc.close();
+                                    return resolve(candidate);
+                                }
+                            }
+                        }
+                    }
+                    pc.close();
+                    console.log('No MAC address found in SDP');
+                    resolve(null);
+                })
+                .catch((error) => {
+                    console.error('WebRTC error:', error);
+                    pc.close();
+                    resolve(null);
+                });
+        });
+    } catch (error) {
+        console.error('MAC address detection error:', error);
+        return null;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     const modal = document.getElementById('verificationModal');
     const closeBtn = modal.querySelector('.close');
@@ -224,21 +308,51 @@ document.addEventListener('DOMContentLoaded', function () {
             verifiedCoords = null;
 
             try {
+                // 1. Cihaz eşleşmesi kontrolü
                 const pairingRes = await fetch('/student/api/check-device-pairing');
                 const pairing = await pairingRes.json();
+                
                 if (pairing.success && pairing.required !== false && !pairing.has_pairing) {
                     alert('Yoklamaya katılmak için önce cihaz eşlemesi yapmalısınız.');
                     window.location.href = '/student/verifications';
                     return;
                 }
-            } catch (_) {
-                alert('Cihaz eşleşmesi kontrol edilemedi. Lütfen Doğrulamalar sayfasını kontrol edin.');
+
+                // 2. Cihaz doğrulaması kontrolü (aynı cihaz mı?)
+                if (pairing.has_pairing) {
+                    const validateRes = await fetch('/student/api/validate-device', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ device_id: await getOrCreateDeviceId() })
+                    });
+                    const validate = await validateRes.json();
+                    
+                    if (!validate.valid) {
+                        alert('Bu hesap size ait değil. Eşleşen cihaz farklı. Sadece eşleşen cihazdan yoklamaya katılabilirsiniz.');
+                        return;
+                    }
+                }
+
+                // 3. Konum doğrulaması kontrolü
+                const locationRes = await fetch('/student/api/check-location-verification');
+                const location = await locationRes.json();
+                
+                if (location.success && !location.verified) {
+                    alert('Yoklamaya katılmak için önce konum doğrulamanız gerekmektedir.');
+                    window.location.href = '/student/verifications';
+                    return;
+                }
+
+                // Tüm kontroller başarılı, yoklamaya başla
+                modal.style.display = 'block';
+                showStep(1);
+                
+            } catch (error) {
+                console.error('Kontrol hatası:', error);
+                alert('Doğrulama sırasında hata oluştu. Lütfen Doğrulamalar sayfasını kontrol edin.');
                 window.location.href = '/student/verifications';
                 return;
             }
-
-            modal.style.display = 'block';
-            showStep(1);
         });
     });
 

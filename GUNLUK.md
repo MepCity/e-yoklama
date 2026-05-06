@@ -1586,3 +1586,69 @@ Branch `main` ile merge edilmeye hazır. Gelecekte yapılabilecek geliştirmeler
 - `PopularCourse` için admin CRUD arayüzü eklenebilir.
 - `Building`/`Classroom` için admin yönetim sayfası tamamlanabilir.
 - HTTPS kurulumu tamamlandığında geolocation tam doğrulama modu devreye alınabilir.
+
+---
+
+## 2026-05-06 — fk/general-dev Branch Entegrasyonu
+
+**Tarih:** 2026-05-06
+
+**Kaynak:** `fk/general-dev` branch'indeki Ferhat Kara katkıları incelendi ve temizlenerek `main`'e alındı.
+
+### Alınan Değişiklikler
+
+#### REST API Katmanı — `api/verification_simple.py`
+- Yeni Blueprint: `/api/v1/verifications/*`
+- `POST /location` — GPS koordinatıyla konum doğrulama
+- `POST /network` — IP/ağ doğrulama
+- `POST /manual` — Manuel doğrulama
+- `GET /status` — Aktif doğrulama durumu
+- `GET /history` — Doğrulama geçmişi (limit/offset/type filtresi)
+- Tüm endpoint'ler `create_standard_response()` ile tutarlı JSON formatı döner
+- `app.py`'e try/except ile kayıt yapıldı — API yoksa uygulama yine çalışır
+
+#### Frontend API İstemcisi — `static/js/api-client.js`
+- `VerificationAPIClient` sınıfı: standart GET/POST/PUT/DELETE
+- 5 dakika TTL ile istemci taraflı cache
+- `APIError` sınıfı: code, statusCode, details, kullanıcı dostu mesaj
+- `VerificationAPI` yardımcı: `verifyLocation()`, `verifyNetwork()`, `performFullVerification()`
+- Global `window.VerificationAPI` olarak erişilebilir
+
+#### Admin CRUD Genişletmesi — `views/admin.py`
+- `POST /admin/edit_student/<id>` — öğrenci bilgisi güncelleme
+- `POST /admin/reset-student-device-pairing/<id>` — öğrenci cihaz eşlemesi sıfırlama
+- `POST /admin/edit_teacher/<id>` — öğretmen bilgisi güncelleme
+- `generate_course_code()` yardımcı fonksiyonu
+- `POST /admin/edit_course/<id>` — ders bilgisi güncelleme
+- İlgili admin template'leri güncellendi
+
+#### Öğretmen Şüpheli Onay Route'ları — `views/teacher.py`
+- `POST /teacher/approve_suspicious_attendance/<id>` — ayrı onay endpoint'i
+- `POST /teacher/reject_suspicious_attendance/<id>` — ayrı ret endpoint'i
+
+#### Öğrenci Cihaz Güvenliği — `views/student.py`
+- `_derive_device_key()` — HMAC-SHA256 ile cihaz anahtarı türetme
+- `_encrypt_device_id()` — cihaz ID şifreleme
+- `_verify_device_id()` — depolanan hash doğrulama
+- `POST /student/api/validate-device` — cihaz doğrulama endpoint'i
+- Cihaz anahtarı `device_pairing_key.py` yerine `config.DEVICE_PAIRING_SECRET` env'den okunur
+
+#### Model Değişikliği — `models/course.py`
+- `building_id` (Integer) → `building_code` (String, A-H)
+- `classroom_id` (Integer) → `classroom_code` (String, 01-19)
+- Daha okunabilir ve sınıf odası kodlamasına uygun
+
+### Alınmayan Dosyalar (ve Gerekçeleri)
+- `device_pairing_key.py` — hardcoded secret key, güvenlik açığı; `DEVICE_PAIRING_SECRET` env'e taşındı
+- `api/docs/swagger.py` — `flask_restx` + `flask_jwt_extended` bağımlılığı var, projede kurulu değil
+- `__pycache__/` — binary derleme dosyaları, versiyon kontrolüne girmemeli
+- `e_yoklama.db` — veritabanı dosyası, versiyon kontrolüne girmemeli
+- `search_students.py`, `search_all.py` — kişisel isim içeren debug scriptleri
+- `check_pairings.py`, `clear_pairings.py` — tek seferlik debug araçları
+- `migrate_course_fields.py` — geçiş scripti, üretimde çalıştırılmalı, repoya girmemeli
+
+### Düzeltilen Sorunlar
+- `views/student.py`: GitHub'a upload sırasında bozulan `session['user']['id']` ifadeleri (`session[" user\][\id\]`) 14 konumda düzeltildi
+- `app.py`: API blueprint kaydındaki emoji'li `print` ifadeleri temizlendi
+- `api/verification_simple.py`: `create_standard_response()` imzasına eksik `details` parametresi eklendi
+

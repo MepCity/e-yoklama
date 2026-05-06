@@ -198,7 +198,7 @@ def course_schedule(course_id):
                     'course': course
                 })
         
-        days = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma']
+        days = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']
         time_slots = ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
                       '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30',
                       '16:00', '16:30', '17:00', '17:30', '18:00', '18:30']
@@ -817,7 +817,73 @@ def edit_schedule(schedule_id):
         schedule.room = request.form.get('room')
         
         db.commit()
-        flash('Ders programı güncellendi.', 'success')
-        return redirect(url_for('teacher.course_details', course_id=schedule.course_id))
-    
-    return render_template('teacher/edit_schedule.html', schedule=schedule)
+        flash('Program başarıyla güncellendi.', 'success')
+        return redirect(url_for('teacher.schedule'))
+
+
+@teacher_bp.route('/approve_suspicious_attendance/<int:record_id>', methods=['POST'])
+@role_required(1)
+def approve_suspicious_attendance(record_id):
+    """Şüpheli yoklamayı onayla"""
+    try:
+        user_id = session['user']['id']
+        
+        # Yoklama kaydını bul
+        record = db.query(AttendanceRecord).filter_by(id=record_id).first()
+        if not record:
+            return jsonify({'success': False, 'message': 'Yoklama kaydı bulunamadı'}), 404
+        
+        # Öğretmenin kendi dersinin olduğunu kontrol et
+        session_info = db.query(AttendanceSession).join(Course).filter(
+            AttendanceSession.id == record.session_id,
+            Course.teacher_id == user_id
+        ).first()
+        
+        if not session_info:
+            return jsonify({'success': False, 'message': 'Bu derse yetkiniz yok'}), 403
+        
+        # Yoklamayı onayla
+        record.status = 'approved'
+        record.approved_by = user_id
+        record.approved_at = datetime.utcnow()
+        
+        db.commit()
+        
+        return jsonify({'success': True, 'message': 'Şüpheli yoklama başarıyla onaylandı'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@teacher_bp.route('/reject_suspicious_attendance/<int:record_id>', methods=['POST'])
+@role_required(1)
+def reject_suspicious_attendance(record_id):
+    """Şüpheli yoklamayı reddet"""
+    try:
+        user_id = session['user']['id']
+        
+        # Yoklama kaydını bul
+        record = db.query(AttendanceRecord).filter_by(id=record_id).first()
+        if not record:
+            return jsonify({'success': False, 'message': 'Yoklama kaydı bulunamadı'}), 404
+        
+        # Öğretmenin kendi dersinin olduğunu kontrol et
+        session_info = db.query(AttendanceSession).join(Course).filter(
+            AttendanceSession.id == record.session_id,
+            Course.teacher_id == user_id
+        ).first()
+        
+        if not session_info:
+            return jsonify({'success': False, 'message': 'Bu derse yetkiniz yok'}), 403
+        
+        # Yoklamayı reddet
+        record.status = 'rejected'
+        record.rejected_by = user_id
+        record.rejected_at = datetime.utcnow()
+        
+        db.commit()
+        
+        return jsonify({'success': True, 'message': 'Şüpheli yoklama başarıyla reddedildi'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500

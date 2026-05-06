@@ -60,6 +60,14 @@
                             <span class="verification-verified">Doğrulanmış</span>
                         {% elif record.status == 'suspicious' %}
                             <span class="verification-suspicious">Şüpheli</span>
+                            <div class="suspicious-actions">
+                                <button class="btn btn-small btn-success" onclick="approveSuspiciousAttendance({{ record.id }})" title="Onayla">
+                                    ✅ Onayla
+                                </button>
+                                <button class="btn btn-small btn-danger" onclick="rejectSuspiciousAttendance({{ record.id }})" title="Reddet">
+                                    ❌ Reddet
+                                </button>
+                            </div>
                         {% else %}
                             <span class="verification-none">-</span>
                         {% endif %}
@@ -105,6 +113,74 @@
 .status-suspicious {
     background-color: rgba(243, 156, 18, 0.05);
 }
+
+.suspicious-actions {
+    margin-top: 5px;
+    display: flex;
+    gap: 5px;
+}
+
+.suspicious-actions .btn {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+</style>
+
+<script>
+// Şüpheli yoklamayı onayla
+function approveSuspiciousAttendance(recordId) {
+    if (!confirm('Bu şüpheli yoklamayı onaylamak istediğinize emin misiniz?')) {
+        return;
+    }
+    
+    fetch('/teacher/approve_suspicious_attendance/' + recordId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Şüpheli yoklama başarıyla onaylandı.');
+            location.reload();
+        } else {
+            alert('Hata: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Hata:', error);
+        alert('Bir hata oluştu: ' + error.message);
+    });
+}
+
+// Şüpheli yoklamayı reddet
+function rejectSuspiciousAttendance(recordId) {
+    if (!confirm('Bu şüpheli yoklamayı reddetmek istediğinize emin misiniz?')) {
+        return;
+    }
+    
+    fetch('/teacher/reject_suspicious_attendance/' + recordId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Şüpheli yoklama başarıyla reddedildi.');
+            location.reload();
+        } else {
+            alert('Hata: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Hata:', error);
+        alert('Bir hata oluştu: ' + error.message);
+    });
+}
+</script>
 
 .page-header {
     margin-bottom: 20px;
